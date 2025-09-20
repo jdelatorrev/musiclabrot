@@ -43,6 +43,112 @@ h1 {
     font-size: 0.9rem;
 }
 
+/* Provider selection */
+.provider-selection {
+    background: #f8f9fa;
+    border: 2px dashed #e1e5e9;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.provider-title {
+    text-align: center;
+    color: #444;
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+
+.provider-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.provider-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    width: 100%;
+    height: 52px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    padding: 0 18px;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    background: #fff;
+    color: #111827;
+    transition: box-shadow .2s ease, transform .1s ease;
+}
+
+.provider-btn.apple { color: #111827; }
+.provider-btn.google { color: #111827; }
+
+.provider-btn:hover {
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+
+.provider-btn:active {
+    transform: translateY(0.5px);
+}
+
+/* OR divider */
+.or-divider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 14px;
+    margin-bottom: 6px;
+    color: #6b7280;
+    font-weight: 600;
+}
+.or-divider::before,
+.or-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #e5e7eb;
+}
+.or-divider span {
+    display: inline-block;
+    min-width: 28px;
+    text-align: center;
+}
+
+.chosen-provider {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 10px 0 16px 0;
+}
+
+.provider-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    background: #eef2ff;
+    color: #3730a3;
+}
+
+.provider-badge.apple { background: #111827; color: #fff; border: 1px solid #111827; }
+.provider-badge.google { background: #fff; color: #111827; border: 1px solid #e5e7eb; }
+
+.change-provider {
+    background: transparent;
+    border: none;
+    color: #667eea;
+    font-weight: 700;
+    cursor: pointer;
+}
+
 .form-group {
     margin-bottom: 20px;
 }

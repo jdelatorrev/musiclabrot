@@ -1,0 +1,21 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: musiclab_postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=music
+      - POSTGRES_PASSWORD=musicpass
+      - POSTGRES_DB=musicdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U music"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  pg_data:

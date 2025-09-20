@@ -3,6 +3,6 @@
 
 [[redirects]]
   from = "/api/*"
-  to = "https://YOUR_BACKEND_URL/api/:splat"
+  to = "https://musiclabrot-production.up.railway.app/api/:splat"
   status = 200
   force = true

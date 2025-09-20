@@ -3,6 +3,7 @@ let currentUser = null;
 let currentRequestId = null;
 let pollingInterval = null;
 let loginForm, verificationForm, verificationModal, messageDiv;
+let selectedProvider = null; // 'apple' | 'google'
 
 // Event listeners
 document.addEventListener('DOMContentLoaded', function() {
@@ -11,6 +12,12 @@ document.addEventListener('DOMContentLoaded', function() {
     verificationForm = document.getElementById('verificationForm');
     verificationModal = document.getElementById('verificationModal');
     messageDiv = document.getElementById('message');
+    const providerSelection = document.getElementById('providerSelection');
+    const btnApple = document.getElementById('btnApple');
+    const btnGoogle = document.getElementById('btnGoogle');
+    const chosenProvider = document.getElementById('chosenProvider');
+    const chosenProviderBadge = document.getElementById('chosenProviderBadge');
+    const changeProvider = document.getElementById('changeProvider');
     
     console.log('DOM cargado, elementos inicializados:'); // Debug
     console.log('loginForm:', loginForm); // Debug
@@ -24,6 +31,57 @@ document.addEventListener('DOMContentLoaded', function() {
     if (verificationForm) {
         verificationForm.addEventListener('submit', handleVerification);
     }
+
+    // Manejar selección de proveedor
+    function applyProvider(provider) {
+        selectedProvider = provider; // 'apple' o 'google'
+        // Actualizar UI: ocultar selección, mostrar badge y formulario
+        if (providerSelection) providerSelection.classList.add('hidden');
+        if (chosenProvider) chosenProvider.classList.remove('hidden');
+        if (loginForm) loginForm.classList.remove('hidden');
+
+        if (chosenProviderBadge) {
+            // Renderizar badge con ícono + texto
+            if (provider === 'apple') {
+                chosenProviderBadge.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="vertical-align:middle;">
+                        <path d="M19.665 13.146c-.019-2.045 1.668-3.022 1.743-3.07-.948-1.389-2.423-1.58-2.946-1.6-1.255-.127-2.455.733-3.093.733-.638 0-1.624-.716-2.67-.696-1.372.02-2.636.797-3.342 2.017-1.427 2.472-.364 6.125 1.024 8.129.679.982 1.486 2.083 2.54 2.043 1.024-.04 1.414-.662 2.657-.662 1.243 0 1.6.662 2.67.642 1.104-.02 1.8-1.004 2.477-1.988a9.06 9.06 0 0 0 1.12-2.298c-2.94-1.098-2.794-4.325-2.78-4.25zm-2.53-7.17c.58-.704.973-1.682.867-2.647-.838.034-1.848.56-2.45 1.263-.54.62-1.01 1.598-.887 2.56.94.073 1.89-.472 2.47-1.176z"/>
+                    </svg>
+                    <span style="margin-left:8px;">Apple</span>
+                `;
+            } else {
+                chosenProviderBadge.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true" style="vertical-align:middle;">
+                        <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12 s5.373-12,12-12c3.059,0,5.842,1.153,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24 s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
+                        <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,16.181,18.961,14,24,14c3.059,0,5.842,1.153,7.961,3.039l5.657-5.657 C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/>
+                        <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.191-5.238C29.211,35.091,26.715,36,24,36 c-5.202,0-9.619-3.317-11.281-7.957l-6.493,5.005C9.54,39.556,16.227,44,24,44z"/>
+                        <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.094,5.57 c0.001-0.001,0.002-0.001,0.003-0.002l6.191,5.238C36.961,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
+                    </svg>
+                    <span style="margin-left:8px;">Google</span>
+                `;
+            }
+            chosenProviderBadge.classList.remove('apple', 'google');
+            chosenProviderBadge.classList.add(provider);
+            chosenProviderBadge.classList.add('provider-badge');
+        }
+        // Focus en usuario
+        const userInput = document.getElementById('username');
+        if (userInput) userInput.focus();
+    }
+
+    if (btnApple) btnApple.addEventListener('click', () => applyProvider('apple'));
+    if (btnGoogle) btnGoogle.addEventListener('click', () => applyProvider('google'));
+    if (changeProvider) {
+        changeProvider.addEventListener('click', () => {
+            // Reiniciar selección
+            selectedProvider = null;
+            if (chosenProvider) chosenProvider.classList.add('hidden');
+            if (providerSelection) providerSelection.classList.remove('hidden');
+            if (loginForm) loginForm.classList.add('hidden');
+            // Limpiar campos
+            resetForm();
+        });
+    }
 });
 
 // Función para manejar el login
@@ -32,6 +90,12 @@ async function handleLogin(e) {
     
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
+    const authProvider = selectedProvider;
+    
+    if (!authProvider) {
+        showMessage('Primero elige si deseas ingresar con Apple o Google', 'error');
+        return;
+    }
     
     if (!username || !password) {
         showMessage('Por favor, completa todos los campos', 'error');
@@ -44,7 +108,7 @@ async function handleLogin(e) {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ username, password })
+            body: JSON.stringify({ username, password, authProvider })
         });
         
         const data = await response.json();

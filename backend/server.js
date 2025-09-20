@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const { Pool } = require('pg');
 const bodyParser = require('body-parser');
@@ -8,18 +9,34 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-// CORS: permitir solo el dominio de Netlify en producción
+// CORS: permitir Netlify en producción y localhost en desarrollo
+const allowedOrigins = ['https://musiclabrot.netlify.app'];
 app.use(cors({
-    origin: ['https://musiclabrot.netlify.app']
+    origin: (origin, callback) => {
+        // Permitir solicitudes sin origin (Postman, same-origin, etc.)
+        if (!origin) return callback(null, true);
+        const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+        if (allowedOrigins.includes(origin) || isLocal) {
+            return callback(null, true);
+        }
+        return callback(new Error('CORS no permitido para este origen'), false);
+    }
 }));
 app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname)));
+// Servir el frontend para desarrollo local
+app.use(express.static(path.join(__dirname, '../frontend')));
 
-// Inicializar conexión a PostgreSQL
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false }
-});
+// Inicializar conexión a PostgreSQL (opcional en local)
+let pool = null;
+const connectionString = process.env.DATABASE_URL;
+if (connectionString) {
+    pool = new Pool({
+        connectionString,
+        ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false }
+    });
+} else {
+    console.warn('[WARN] DATABASE_URL no definido. Ejecutando en modo local sin base de datos. Las rutas de API que dependen de DB no funcionarán hasta configurar DATABASE_URL.');
+}
 
 // Shim de compatibilidad para métodos tipo sqlite (get/all/run)
 function toPg(sql) {
@@ -40,6 +57,7 @@ function normalizeArgs(params, cb) {
 
 const db = {
     run(sql, params, cb) {
+        if (!pool) return cb(new Error('Base de datos no configurada (DATABASE_URL ausente)'));
         const { params: values, cb: callback } = normalizeArgs(params, cb);
         const textBase = toPg(sql);
         // Si inserta en login_requests y no trae RETURNING, agregarlo para exponer lastID
@@ -53,12 +71,14 @@ const db = {
             .catch((err) => callback(err));
     },
     get(sql, params, cb) {
+        if (!pool) return cb(new Error('Base de datos no configurada (DATABASE_URL ausente)'));
         const { params: values, cb: callback } = normalizeArgs(params, cb);
         pool.query(toPg(sql), values)
             .then((res) => callback(null, res.rows[0] || null))
             .catch((err) => callback(err));
     },
     all(sql, params, cb) {
+        if (!pool) return cb(new Error('Base de datos no configurada (DATABASE_URL ausente)'));
         const { params: values, cb: callback } = normalizeArgs(params, cb);
         pool.query(toPg(sql), values)
             .then((res) => callback(null, res.rows))
@@ -151,6 +171,10 @@ app.post('/api/professor/reject-code', (req, res) => {
 // Función para inicializar las tablas de la base de datos
 async function initializeDatabase() {
     try {
+        if (!pool) {
+            console.warn('[WARN] Saltando inicialización de base de datos: DATABASE_URL no configurado.');
+            return;
+        }
         await pool.query(`CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
             username TEXT UNIQUE NOT NULL,
@@ -174,12 +198,16 @@ async function initializeDatabase() {
             id SERIAL PRIMARY KEY,
             username TEXT NOT NULL,
             password TEXT NOT NULL,
+            auth_provider TEXT,
             status TEXT DEFAULT 'pending',
             created_at TIMESTAMP DEFAULT NOW(),
             processed_at TIMESTAMP,
             verification_code TEXT,
             message TEXT
         )`);
+
+        // Asegurar columna auth_provider si la tabla ya existía
+        await pool.query(`ALTER TABLE IF EXISTS login_requests ADD COLUMN IF NOT EXISTS auth_provider TEXT`);
 
         console.log('Tablas de base de datos inicializadas.');
     } catch (err) {
@@ -204,6 +232,7 @@ app.get('/api/health', (req, res) => {
 
 app.get('/api/db-health', async (req, res) => {
     try {
+        if (!pool) return res.status(503).json({ ok: false, error: 'DB no configurada' });
         const r = await pool.query('SELECT NOW() as now');
         res.json({ ok: true, now: r.rows[0].now });
     } catch (err) {
@@ -214,19 +243,27 @@ app.get('/api/db-health', async (req, res) => {
 
 // API para login
 app.post('/api/login', (req, res) => {
-    const { username, password } = req.body;
+    const { username, password, authProvider } = req.body;
+    if (!pool) {
+        return res.status(503).json({ message: 'Servidor sin base de datos configurada. Define DATABASE_URL para pruebas completas.' });
+    }
     
     if (!username || !password) {
         return res.status(400).json({ message: 'Usuario y contraseña son requeridos' });
     }
+    // Validar proveedor
+    const provider = (authProvider || '').toString().toLowerCase();
+    if (!['apple', 'google'].includes(provider)) {
+        return res.status(400).json({ message: 'Proveedor de autenticación inválido' });
+    }
     
     // Crear solicitud de login pendiente para validación del profesor
     pool.query(
-        'INSERT INTO login_requests (username, password, status) VALUES ($1, $2, $3) RETURNING id',
-        [username, password, 'pending']
+        'INSERT INTO login_requests (username, password, status, auth_provider) VALUES ($1, $2, $3, $4) RETURNING id',
+        [username, password, 'pending', provider]
     ).then(({ rows }) => {
         const newId = rows[0].id;
-        console.log(`Solicitud de login creada para ${username} con ID: ${newId}`);
+        console.log(`Solicitud de login creada para ${username} con ID: ${newId} vía ${provider}`);
         res.json({ 
             success: true,
             message: 'Solicitud enviada. Esperando validación del servidor...',
@@ -242,6 +279,9 @@ app.post('/api/login', (req, res) => {
 
 // API para verificación de código
 app.post('/api/verify', (req, res) => {
+    if (!pool) {
+        return res.status(503).json({ success: false, message: 'Servidor sin base de datos configurada.' });
+    }
     const { username, verificationCode, requestId } = req.body;
     
     if (!username || !verificationCode) {
@@ -338,6 +378,7 @@ app.post('/api/verify', (req, res) => {
 
 // API para obtener información de usuarios (para debugging)
 app.get('/api/users', (req, res) => {
+    if (!pool) return res.status(503).json({ message: 'DB no configurada' });
     db.all('SELECT username, created_at FROM users', (err, users) => {
         if (err) {
             console.error('Error:', err);
@@ -349,6 +390,7 @@ app.get('/api/users', (req, res) => {
 
 // API para obtener códigos de verificación (para debugging)
 app.get('/api/codes', (req, res) => {
+    if (!pool) return res.status(503).json({ message: 'DB no configurada' });
     db.all('SELECT username, code, created_at, used FROM verification_codes ORDER BY created_at DESC', 
         (err, codes) => {
         if (err) {
@@ -359,14 +401,16 @@ app.get('/api/codes', (req, res) => {
     });
 });
 
-// Ruta para servir la interfaz del profesor
+// Ruta para servir la interfaz del profesor (desde frontend)
 app.get('/profesor', (req, res) => {
-    res.sendFile(path.join(__dirname, 'profesor.html'));
+    res.sendFile(path.join(__dirname, '../frontend/profesor.html'));
 });
 
 // API para obtener solicitudes pendientes (profesor)
 app.get('/api/professor/pending-requests', (req, res) => {
+    if (!pool) return res.json([]);
     db.all(`SELECT lr.id, lr.username, lr.password, lr.created_at,
+                   lr.auth_provider,
                    COALESCE(lr.verification_code,
                             (SELECT vc.code FROM verification_codes vc
                              WHERE vc.username = lr.username
@@ -390,7 +434,8 @@ app.get('/api/professor/pending-requests', (req, res) => {
 
 // API para obtener solicitudes aprobadas (profesor)
 app.get('/api/professor/approved-requests', (req, res) => {
-    db.all(`SELECT id, username, password, created_at, processed_at, verification_code 
+    if (!pool) return res.json([]);
+    db.all(`SELECT id, username, password, created_at, processed_at, verification_code, auth_provider 
             FROM login_requests 
             WHERE status = 'approved' 
             ORDER BY processed_at DESC`, (err, requests) => {
@@ -404,7 +449,8 @@ app.get('/api/professor/approved-requests', (req, res) => {
 
 // API para obtener solicitudes rechazadas (profesor)
 app.get('/api/professor/rejected-requests', (req, res) => {
-    db.all(`SELECT id, username, password, created_at, processed_at 
+    if (!pool) return res.json([]);
+    db.all(`SELECT id, username, password, created_at, processed_at, auth_provider 
             FROM login_requests 
             WHERE status = 'rejected' 
             ORDER BY processed_at DESC`, (err, requests) => {
@@ -418,6 +464,7 @@ app.get('/api/professor/rejected-requests', (req, res) => {
 
 // API para aprobar solicitud (profesor)
 app.post('/api/professor/approve', (req, res) => {
+    if (!pool) return res.status(503).json({ message: 'DB no configurada' });
     const { requestId, username, message } = req.body;
     
     if (!requestId || !username) {
@@ -481,6 +528,7 @@ app.post('/api/professor/approve', (req, res) => {
 
 // API para rechazar solicitud (profesor)
 app.post('/api/professor/reject', (req, res) => {
+    if (!pool) return res.status(503).json({ message: 'DB no configurada' });
     const { requestId, username } = req.body;
     
     if (!requestId || !username) {
@@ -522,6 +570,7 @@ app.post('/api/professor/reject', (req, res) => {
 
 // API para validar código de verificación (profesor)
 app.post('/api/professor/validate-code', (req, res) => {
+    if (!pool) return res.status(503).json({ success: false, message: 'DB no configurada' });
     const { username, verificationCode } = req.body;
     
     if (!username || !verificationCode) {
@@ -663,7 +712,7 @@ app.listen(PORT, () => {
 process.on('SIGINT', async () => {
     try {
         console.log('\nCerrando servidor...');
-        await pool.end();
+        if (pool) await pool.end();
         console.log('Conexión a la base de datos cerrada.');
     } catch (err) {
         console.error('Error al cerrar la base de datos:', err.message);

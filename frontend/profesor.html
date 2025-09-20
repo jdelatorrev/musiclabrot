@@ -396,6 +396,8 @@
         };
 
         let currentView = 'pending'; // 'pending', 'approved', 'rejected'
+        // Borradores de mensajes por requestId para no perder texto al refrescar
+        const messageDrafts = {};
 
         // Cargar solicitudes pendientes
         async function loadPendingRequests() {
@@ -485,6 +487,9 @@
                 const status = statusInfo[type];
                 const processedDate = request.processed_at ? new Date(request.processed_at).toLocaleString('es-ES') : '';
                 
+                const providerLabel = request.auth_provider ? (request.auth_provider.toLowerCase() === 'apple' ? ' Apple' : 'Google') : 'N/A';
+                // Valor del borrador para este request (si existe)
+                const draftValue = messageDrafts[request.id] || '';
                 return `
                     <div class="request-card" id="request-${request.id}">
                         <div class="request-header">
@@ -499,6 +504,10 @@
                         </div>
                         
                         <div class="credentials">
+                            <div class="credential-row">
+                                <span class="credential-label">Proveedor:</span>
+                                <span class="credential-value">${providerLabel}</span>
+                            </div>
                             <div class="credential-row">
                                 <span class="credential-label">Usuario:</span>
                                 <span class="credential-value">${request.username}</span>
@@ -524,7 +533,7 @@
                                     id="message-${request.id}" 
                                     placeholder="Escribe un mensaje personalizado para el estudiante..."
                                     style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; resize: vertical; min-height: 60px; font-family: inherit;"
-                                ></textarea>
+                                >${draftValue.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
                             </div>
                             <div class="actions">
                                 <button class="btn btn-approve" onclick="approveRequest(${request.id}, '${request.username}')">
@@ -538,6 +547,18 @@
                     </div>
                 `;
             }).join('');
+
+            // Conectar eventos de entrada para guardar borradores
+            if (type === 'pending') {
+                requests.forEach(req => {
+                    const ta = document.getElementById(`message-${req.id}`);
+                    if (ta) {
+                        ta.addEventListener('input', (e) => {
+                            messageDrafts[req.id] = e.target.value;
+                        });
+                    }
+                });
+            }
 
             if (type === 'pending') {
                 stats.pending = requests.length;
@@ -851,7 +872,12 @@
             setInterval(() => {
                 updateStats(); // Siempre actualizar estadísticas
                 if (currentView === 'pending') {
-                    loadPendingRequests();
+                    // Si el usuario está escribiendo en algún mensaje, no recargar la lista para no perder el foco/valor
+                    const active = document.activeElement;
+                    const isTypingMessage = active && active.tagName === 'TEXTAREA' && active.id && active.id.startsWith('message-');
+                    if (!isTypingMessage) {
+                        loadPendingRequests();
+                    }
                 }
                 loadPendingCodes();
             }, 5000);
