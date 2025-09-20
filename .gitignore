@@ -1,9 +1,11 @@
 # Dependencies
 /backend/node_modules/
 /frontend/node_modules/
+node_modules/
 
 # Local DB (legacy)
 /backend/music_auth.db
+music_auth.db
 
 # Environment variables
 .env
