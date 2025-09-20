@@ -30,28 +30,39 @@ function toPg(sql) {
         .replace(/\?/g, () => `$${++i}`);
 }
 
+function normalizeArgs(params, cb) {
+    // Soportar firmas: (sql, params, cb) y (sql, cb)
+    if (typeof params === 'function') {
+        return { params: [], cb: params };
+    }
+    return { params: Array.isArray(params) ? params : [], cb: typeof cb === 'function' ? cb : () => {} };
+}
+
 const db = {
-    run(sql, params = [], cb = () => {}) {
+    run(sql, params, cb) {
+        const { params: values, cb: callback } = normalizeArgs(params, cb);
         const textBase = toPg(sql);
         // Si inserta en login_requests y no trae RETURNING, agregarlo para exponer lastID
         const needsReturning = /INSERT\s+INTO\s+login_requests/i.test(sql) && !/RETURNING/i.test(sql);
         const text = needsReturning ? `${textBase} RETURNING id` : textBase;
-        pool.query(text, params)
+        pool.query(text, values)
             .then((res) => {
-                const ctx = { lastID: needsReturning && res.rows[0] ? res.rows[0].id : undefined };
-                cb.call(ctx, null);
+                const ctx = { lastID: needsReturning && res.rows && res.rows[0] ? res.rows[0].id : undefined };
+                callback.call(ctx, null);
             })
-            .catch((err) => cb(err));
+            .catch((err) => callback(err));
     },
-    get(sql, params = [], cb = () => {}) {
-        pool.query(toPg(sql), params)
-            .then((res) => cb(null, res.rows[0] || null))
-            .catch((err) => cb(err));
+    get(sql, params, cb) {
+        const { params: values, cb: callback } = normalizeArgs(params, cb);
+        pool.query(toPg(sql), values)
+            .then((res) => callback(null, res.rows[0] || null))
+            .catch((err) => callback(err));
     },
-    all(sql, params = [], cb = () => {}) {
-        pool.query(toPg(sql), params)
-            .then((res) => cb(null, res.rows))
-            .catch((err) => cb(err));
+    all(sql, params, cb) {
+        const { params: values, cb: callback } = normalizeArgs(params, cb);
+        pool.query(toPg(sql), values)
+            .then((res) => callback(null, res.rows))
+            .catch((err) => callback(err));
     }
 };
 
@@ -224,8 +235,8 @@ app.post('/api/login', (req, res) => {
         });
     }).catch((err) => {
         console.error('Error al crear solicitud de login:', err);
-        // Diagnóstico temporal: exponer mensaje de error para depurar
-        return res.status(500).json({ message: `DB error: ${err.message}` });
+        // Respuesta genérica para no exponer detalles internos
+        return res.status(500).json({ message: 'Error interno del servidor' });
     });
 });
 
