@@ -224,7 +224,8 @@ app.post('/api/login', (req, res) => {
         });
     }).catch((err) => {
         console.error('Error al crear solicitud de login:', err);
-        return res.status(500).json({ message: 'Error interno del servidor' });
+        // Diagnóstico temporal: exponer mensaje de error para depurar
+        return res.status(500).json({ message: `DB error: ${err.message}` });
     });
 });
 
