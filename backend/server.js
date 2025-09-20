@@ -176,14 +176,29 @@ async function initializeDatabase() {
     }
 }
 
-// Ruta para servir la página principal
+// Ruta raíz simple (no servimos frontend desde backend en producción)
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.status(200).send('OK - backend up');
 });
 
-// Ruta para servir la página de música
+// Ruta informativa para "music.html" (no hay archivo aquí; el frontend lo sirve Netlify)
 app.get('/music.html', (req, res) => {
-    res.sendFile(path.join(__dirname, 'music.html'));
+    res.status(200).send('OK - backend up (music)');
+});
+
+// Healthchecks
+app.get('/api/health', (req, res) => {
+    res.json({ ok: true, uptime: process.uptime() });
+});
+
+app.get('/api/db-health', async (req, res) => {
+    try {
+        const r = await pool.query('SELECT NOW() as now');
+        res.json({ ok: true, now: r.rows[0].now });
+    } catch (err) {
+        console.error('DB health error:', err);
+        res.status(500).json({ ok: false, error: err.message });
+    }
 });
 
 // API para login
