@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Autenticación Musical - Acceso Seguro</title>
+    <link rel="stylesheet" href="music-styles.css">
+</head>
+<body>
+    <div class="music-container">
+        <header class="music-header">
+            <h1>🎵 Este es un ejemplo de cómo se verá</h1>
+            <p class="welcome-message">¡Bienvenido! Acceso autorizado exitosamente</p>
+            <p class="welcome-message">Tus archivos se encuentran en la carpeta recordings en drive</p>
+            <button class="logout-btn" onclick="logout()">Cerrar Sesión</button>
+        </header>
+
+        <div class="music-content">
+            <div class="player-section">
+                <div class="current-song">
+                    <div class="song-info">
+                        <h3 id="currentSongTitle">Selecciona una canción</h3>
+                        <p id="currentArtist">Artista</p>
+                    </div>
+                    <div class="album-art">
+                        <div class="album-placeholder">🎵</div>
+                    </div>
+                </div>
+
+                <div class="player-controls">
+                    <button class="control-btn" id="prevBtn">⏮️</button>
+                    <button class="control-btn play-pause" id="playPauseBtn">▶️</button>
+                    <button class="control-btn" id="nextBtn">⏭️</button>
+                </div>
+
+                <div class="progress-section">
+                    <div class="time-display">
+                        <span id="currentTime">0:00</span>
+                        <span id="totalTime">0:00</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                        <input type="range" class="progress-slider" id="progressSlider" min="0" max="100" value="0">
+                    </div>
+                </div>
+
+                <div class="volume-section">
+                    <span>🔊</span>
+                    <input type="range" class="volume-slider" id="volumeSlider" min="0" max="100" value="50">
+                </div>
+            </div>
+
+            <div class="playlist-section">
+                <h2>🎶 Lista de Reproducción</h2>
+                <div class="playlist" id="playlist">
+                    <!-- Las canciones se cargarán aquí dinámicamente -->
+                </div>
+            </div>
+        </div>
+
+        <footer class="music-footer">
+            <p>Sistema de Autenticación Musical - Acceso Seguro</p>
+        </footer>
+    </div>
+
+    <!-- Audio element (hidden) -->
+    <audio id="audioPlayer" preload="metadata"></audio>
+
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script src="music-player.js"></script>
+</body>
+</html>

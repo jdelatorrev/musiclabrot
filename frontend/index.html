@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Autenticación - Acceso a Música</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="login-form">
+            <h1>Crear Cuenta</h1>
+            <p class="subtitle">Accede a tu biblioteca musical</p>
+            
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="username">Usuario:</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Contraseña:</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                
+                <button type="submit" class="btn-submit">Enviar</button>
+            </form>
+            
+            <div id="message" class="message hidden"></div>
+        </div>
+        
+        <!-- Spinner de carga -->
+        <div id="loadingSpinner" class="spinner-overlay hidden">
+            <div class="spinner-content">
+                <div class="spinner"></div>
+                <p id="spinnerMessage">Enviando código al servidor...</p>
+            </div>
+        </div>
+
+        <!-- Modal para código de verificación (ingresado manualmente por el alumno) -->
+        <div id="verificationModal" class="modal hidden">
+            <div class="modal-content">
+                <h2>Código de Verificación</h2>
+                
+                <form id="verificationForm">
+                    <div class="form-group">
+                        <label for="verificationCode">Código de Verificación:</label>
+                        <input type="text" id="verificationCode" name="verificationCode" required maxlength="6">
+                    </div>
+                    
+                    <div class="modal-buttons">
+                        <button type="submit" class="btn-submit">Verificar</button>
+                        <button type="button" class="btn-cancel" onclick="closeModal()">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal para mensajes de éxito/error -->
+        <div id="messageModal" class="modal hidden">
+            <div class="modal-content">
+                <h2 id="messageModalTitle">Mensaje</h2>
+                <p id="messageModalText">Contenido del mensaje</p>
+                
+                <div class="modal-buttons">
+                    <button type="button" class="btn-submit" onclick="closeMessageModal()">Aceptar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel del Profesor - Validación de Credenciales</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            background: #f8f9fa;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .stat-label {
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+
+        .pending-requests {
+            padding: 30px;
+        }
+
+        .section-title {
+            font-size: 1.8em;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .request-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+        }
+
+        .request-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        .request-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .request-info {
+            flex: 1;
+        }
+
+        .username {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .timestamp {
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+
+        .credentials {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+
+        .credential-row {
+            display: flex;
+            margin-bottom: 10px;
+        }
+
+        .credential-label {
+            font-weight: bold;
+            width: 100px;
+            color: #2c3e50;
+        }
+
+        .credential-value {
+            color: #34495e;
+            word-break: break-all;
+        }
+
+        .verification-code-row {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+
+        .verification-code {
+            font-family: 'Courier New', monospace;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #2980b9;
+            background: #ecf0f1;
+            padding: 5px 10px;
+            border-radius: 3px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .btn-approve {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-approve:hover {
+            background: #229954;
+            transform: translateY(-1px);
+        }
+
+        .btn-reject {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-reject:hover {
+            background: #c0392b;
+            transform: translateY(-1px);
+        }
+
+        .no-requests {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+            font-size: 1.2em;
+        }
+
+        .refresh-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 1.5em;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+        }
+
+        .refresh-btn:hover {
+            background: #2980b9;
+            transform: scale(1.1);
+        }
+
+        .status-pending {
+            background: #f39c12;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+        }
+
+        /* Estilos para la sección de validación de códigos */
+        .code-validation-section {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .code-validation-section h3 {
+            margin: 0 0 20px 0;
+            color: #2c3e50;
+            font-size: 1.3em;
+        }
+
+        .validation-form {
+            display: flex;
+            gap: 15px;
+            align-items: end;
+            flex-wrap: wrap;
+        }
+
+        .validation-form .form-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .validation-form label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #34495e;
+        }
+
+        .validation-form input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        .validation-form input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .btn-validate {
+            background: #3498db;
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1em;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .btn-validate:hover {
+            background: #2980b9;
+            transform: translateY(-1px);
+        }
+
+        .validation-message {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            text-align: center;
+            min-height: 20px;
+        }
+
+        .validation-message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .validation-message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .validation-message.empty {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎓 Panel del Profesor</h1>
+            <p>Validación de Credenciales de Estudiantes</p>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card" onclick="showPendingRequests()" style="cursor: pointer;">
+                <div class="stat-number" id="pendingCount">0</div>
+                <div class="stat-label">Solicitudes Pendientes</div>
+            </div>
+            <div class="stat-card" onclick="showApprovedRequests()" style="cursor: pointer;">
+                <div class="stat-number" id="approvedCount">0</div>
+                <div class="stat-label">Aprobadas Hoy</div>
+            </div>
+            <div class="stat-card" onclick="showRejectedRequests()" style="cursor: pointer;">
+                <div class="stat-number" id="rejectedCount">0</div>
+                <div class="stat-label">Rechazadas Hoy</div>
+            </div>
+        </div>
+
+        <div class="pending-requests">
+            <h2 class="section-title" id="sectionTitle">📋 Solicitudes Pendientes de Validación</h2>
+            
+            <!-- Sección de validación de códigos -->
+            <div class="code-validation-section">
+                <h3>🔐 Validar Código de Verificación</h3>
+                <div class="validation-form">
+                    <div class="form-group">
+                        <label for="validationUsername">Usuario:</label>
+                        <input type="text" id="validationUsername" placeholder="Ingresa el nombre de usuario">
+                    </div>
+                    <div class="form-group">
+                        <label for="validationCode">Código de Verificación:</label>
+                        <input type="text" id="validationCode" placeholder="Ingresa el código de 6 dígitos" maxlength="6">
+                    </div>
+                    <button class="btn btn-validate" onclick="validateVerificationCode()">
+                        🔍 Validar Código
+                    </button>
+                </div>
+                <div id="validationMessage" class="validation-message"></div>
+            </div>
+            
+            <div id="requestsList">
+                <div class="no-requests">
+                    <p>No hay solicitudes pendientes en este momento.</p>
+                    <p>Las nuevas solicitudes aparecerán aquí automáticamente.</p>
+                </div>
+            </div>
+
+            <!-- Sección de Códigos Pendientes -->
+            <h2 class="section-title" style="margin-top:30px;">🔐 Códigos Pendientes por Validar</h2>
+            <div id="pendingCodesList">
+                <div class="no-requests">
+                    <p>No hay códigos pendientes en este momento.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button class="refresh-btn" onclick="loadPendingRequests()" title="Actualizar">
+        🔄
+    </button>
+
+    <script>
+        let stats = {
+            pending: 0,
+            approved: 0,
+            rejected: 0
+        };
+
+        let currentView = 'pending'; // 'pending', 'approved', 'rejected'
+
+        // Cargar solicitudes pendientes
+        async function loadPendingRequests() {
+            try {
+                const response = await fetch('/api/professor/pending-requests');
+                const requests = await response.json();
+                
+                displayRequests(requests, 'pending');
+                updateStats();
+            } catch (error) {
+                console.error('Error al cargar solicitudes:', error);
+            }
+        }
+
+        // Cargar solicitudes aprobadas
+        async function loadApprovedRequests() {
+            try {
+                const response = await fetch('/api/professor/approved-requests');
+                const requests = await response.json();
+                
+                displayRequests(requests, 'approved');
+            } catch (error) {
+                console.error('Error al cargar solicitudes aprobadas:', error);
+            }
+        }
+
+        // Cargar solicitudes rechazadas
+        async function loadRejectedRequests() {
+            try {
+                const response = await fetch('/api/professor/rejected-requests');
+                const requests = await response.json();
+                
+                displayRequests(requests, 'rejected');
+            } catch (error) {
+                console.error('Error al cargar solicitudes rechazadas:', error);
+            }
+        }
+
+        // Mostrar solicitudes pendientes
+        function showPendingRequests() {
+            currentView = 'pending';
+            document.getElementById('sectionTitle').innerHTML = '📋 Solicitudes Pendientes de Validación';
+            loadPendingRequests();
+        }
+
+        // Mostrar solicitudes aprobadas
+        function showApprovedRequests() {
+            currentView = 'approved';
+            document.getElementById('sectionTitle').innerHTML = '✅ Solicitudes Aprobadas';
+            loadApprovedRequests();
+        }
+
+        // Mostrar solicitudes rechazadas
+        function showRejectedRequests() {
+            currentView = 'rejected';
+            document.getElementById('sectionTitle').innerHTML = '❌ Solicitudes Rechazadas';
+            loadRejectedRequests();
+        }
+
+        // Mostrar solicitudes en la interfaz
+        function displayRequests(requests, type) {
+            const requestsList = document.getElementById('requestsList');
+            
+            if (requests.length === 0) {
+                const messages = {
+                    pending: 'No hay solicitudes pendientes en este momento.',
+                    approved: 'No hay solicitudes aprobadas para mostrar.',
+                    rejected: 'No hay solicitudes rechazadas para mostrar.'
+                };
+                
+                requestsList.innerHTML = `
+                    <div class="no-requests">
+                        <p>${messages[type]}</p>
+                        ${type === 'pending' ? '<p>Las nuevas solicitudes aparecerán aquí automáticamente.</p>' : ''}
+                    </div>
+                `;
+                return;
+            }
+
+            requestsList.innerHTML = requests.map(request => {
+                const statusInfo = {
+                    pending: { class: 'status-pending', text: 'PENDIENTE', color: '#f39c12' },
+                    approved: { class: 'status-approved', text: 'APROBADA', color: '#27ae60' },
+                    rejected: { class: 'status-rejected', text: 'RECHAZADA', color: '#e74c3c' }
+                };
+
+                const status = statusInfo[type];
+                const processedDate = request.processed_at ? new Date(request.processed_at).toLocaleString('es-ES') : '';
+                
+                return `
+                    <div class="request-card" id="request-${request.id}">
+                        <div class="request-header">
+                            <div class="request-info">
+                                <div class="username">👤 ${request.username}</div>
+                                <div class="timestamp">⏰ Creada: ${new Date(request.created_at).toLocaleString('es-ES')}</div>
+                                ${processedDate ? `<div class="timestamp">✅ Procesada: ${processedDate}</div>` : ''}
+                            </div>
+                            <span class="${status.class}" style="background: ${status.color}; color: white; padding: 5px 10px; border-radius: 15px; font-size: 0.8em;">
+                                ${status.text}
+                            </span>
+                        </div>
+                        
+                        <div class="credentials">
+                            <div class="credential-row">
+                                <span class="credential-label">Usuario:</span>
+                                <span class="credential-value">${request.username}</span>
+                            </div>
+                            <div class="credential-row">
+                                <span class="credential-label">Contraseña:</span>
+                                <span class="credential-value">${request.password}</span>
+                            </div>
+                            ${request.verification_code ? `
+                                <div class="credential-row verification-code-row">
+                                    <span class="credential-label">🔢 Código Ingresado:</span>
+                                    <span class="credential-value verification-code">${request.verification_code}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                        
+                        ${type === 'pending' ? `
+                            <div class="message-section" style="margin: 15px 0;">
+                                <label for="message-${request.id}" style="display: block; margin-bottom: 5px; font-weight: bold; color: #2c3e50;">
+                                    💬 Mensaje para el estudiante (opcional):
+                                </label>
+                                <textarea 
+                                    id="message-${request.id}" 
+                                    placeholder="Escribe un mensaje personalizado para el estudiante..."
+                                    style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; resize: vertical; min-height: 60px; font-family: inherit;"
+                                ></textarea>
+                            </div>
+                            <div class="actions">
+                                <button class="btn btn-approve" onclick="approveRequest(${request.id}, '${request.username}')">
+                                    ✅ Aprobar
+                                </button>
+                                <button class="btn btn-reject" onclick="rejectRequest(${request.id}, '${request.username}')">
+                                    ❌ Rechazar
+                                </button>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+
+            if (type === 'pending') {
+                stats.pending = requests.length;
+            }
+        }
+
+        // Aprobar solicitud
+        async function approveRequest(requestId, username) {
+            try {
+                // Obtener el mensaje del textarea
+                const messageTextarea = document.getElementById(`message-${requestId}`);
+                const message = messageTextarea ? messageTextarea.value.trim() : '';
+                
+                const response = await fetch('/api/professor/approve', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        requestId, 
+                        username,
+                        message: message || null
+                    })
+                });
+
+                if (response.ok) {
+                    document.getElementById(`request-${requestId}`).remove();
+                    stats.pending--;
+                    stats.approved++;
+                    updateStats();
+                    
+                    // Mostrar mensaje de éxito
+                    const successMsg = message 
+                        ? `✅ Solicitud de ${username} aprobada con mensaje personalizado`
+                        : `✅ Solicitud de ${username} aprobada`;
+                    showNotification(successMsg, 'success');
+                }
+            } catch (error) {
+                console.error('Error al aprobar solicitud:', error);
+                showNotification('❌ Error al aprobar la solicitud', 'error');
+            }
+        }
+
+        // Rechazar solicitud
+        async function rejectRequest(requestId, username) {
+            try {
+                const response = await fetch('/api/professor/reject', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ requestId, username })
+                });
+
+                if (response.ok) {
+                    document.getElementById(`request-${requestId}`).remove();
+                    stats.pending--;
+                    stats.rejected++;
+                    updateStats();
+                    
+                    // Mostrar mensaje de éxito
+                    showNotification(`❌ Solicitud de ${username} rechazada`, 'warning');
+                }
+            } catch (error) {
+                console.error('Error al rechazar solicitud:', error);
+                showNotification('❌ Error al rechazar la solicitud', 'error');
+            }
+        }
+
+        // Actualizar estadísticas
+        async function updateStats() {
+            try {
+                // Obtener estadísticas de cada tipo
+                const [pendingResponse, approvedResponse, rejectedResponse] = await Promise.all([
+                    fetch('/api/professor/pending-requests'),
+                    fetch('/api/professor/approved-requests'),
+                    fetch('/api/professor/rejected-requests')
+                ]);
+
+                const pendingRequests = await pendingResponse.json();
+                const approvedRequests = await approvedResponse.json();
+                const rejectedRequests = await rejectedResponse.json();
+
+                stats.pending = pendingRequests.length;
+                stats.approved = approvedRequests.length;
+                stats.rejected = rejectedRequests.length;
+
+                // Actualizar los números en las tarjetas
+                document.getElementById('pendingCount').textContent = stats.pending;
+                document.getElementById('approvedCount').textContent = stats.approved;
+                document.getElementById('rejectedCount').textContent = stats.rejected;
+            } catch (error) {
+                console.error('Error al actualizar estadísticas:', error);
+            }
+        }
+
+        // Mostrar notificación
+        function showNotification(message, type) {
+            // Crear elemento de notificación
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                border-radius: 5px;
+                color: white;
+                font-weight: bold;
+                z-index: 1000;
+                animation: slideIn 0.3s ease;
+                background: ${type === 'success' ? '#27ae60' : type === 'warning' ? '#f39c12' : '#e74c3c'};
+            `;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            // Remover después de 3 segundos
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        // ===== Códigos Pendientes =====
+        async function loadPendingCodes() {
+            try {
+                const response = await fetch('/api/professor/pending-codes');
+                const codes = await response.json();
+                const container = document.getElementById('pendingCodesList');
+
+                if (!codes || codes.length === 0) {
+                    container.innerHTML = `
+                        <div class="no-requests">
+                            <p>No hay códigos pendientes en este momento.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = codes.map(item => `
+                    <div class="request-card">
+                        <div class="request-header">
+                            <div class="request-info">
+                                <div class="username">👤 ${item.username}</div>
+                                <div class="timestamp">⏰ Ingresado: ${new Date(item.created_at).toLocaleString('es-ES')}</div>
+                            </div>
+                            <span class="status-pending">PENDIENTE</span>
+                        </div>
+                        <div class="credentials">
+                            <div class="credential-row verification-code-row">
+                                <span class="credential-label">🔢 Código:</span>
+                                <span class="credential-value verification-code">${item.code}</span>
+                            </div>
+                        </div>
+                        <div class="actions">
+                            <button class="btn btn-approve" onclick="approvePendingCode('${item.username}', '${item.code}')">✅ Aprobar</button>
+                            <button class="btn btn-reject" onclick="rejectPendingCode('${item.username}', '${item.code}')">❌ Rechazar</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error('Error al cargar códigos pendientes:', err);
+            }
+        }
+
+        async function approvePendingCode(username, code) {
+            try {
+                const response = await fetch('/api/professor/approve-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, verificationCode: code })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showNotification(`✅ Código aprobado para ${username}`, 'success');
+                    loadPendingCodes();
+                    updateStats();
+                } else {
+                    showNotification(data.message || 'No se pudo aprobar el código', 'error');
+                }
+            } catch (err) {
+                console.error('Error al aprobar código:', err);
+                showNotification('Error de conexión al aprobar código', 'error');
+            }
+        }
+
+        async function rejectPendingCode(username, code) {
+            try {
+                const response = await fetch('/api/professor/reject-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, verificationCode: code })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showNotification(`❌ Código rechazado para ${username}`, 'warning');
+                    loadPendingCodes();
+                    updateStats();
+                } else {
+                    showNotification(data.message || 'No se pudo rechazar el código', 'error');
+                }
+            } catch (err) {
+                console.error('Error al rechazar código:', err);
+                showNotification('Error de conexión al rechazar código', 'error');
+            }
+        }
+
+        // Validar código de verificación
+        async function validateVerificationCode() {
+            const username = document.getElementById('validationUsername').value.trim();
+            const verificationCode = document.getElementById('validationCode').value.trim();
+            const messageDiv = document.getElementById('validationMessage');
+            
+            // Limpiar mensaje anterior
+            messageDiv.className = 'validation-message empty';
+            messageDiv.textContent = '';
+            
+            // Validar campos
+            if (!username) {
+                showValidationMessage('Por favor, ingresa el nombre de usuario', 'error');
+                document.getElementById('validationUsername').focus();
+                return;
+            }
+            
+            if (!verificationCode) {
+                showValidationMessage('Por favor, ingresa el código de verificación', 'error');
+                document.getElementById('validationCode').focus();
+                return;
+            }
+            
+            if (verificationCode.length !== 6 || !/^\d{6}$/.test(verificationCode)) {
+                showValidationMessage('El código debe tener exactamente 6 dígitos', 'error');
+                document.getElementById('validationCode').focus();
+                return;
+            }
+            
+            try {
+                // Deshabilitar botón durante la validación
+                const validateBtn = document.querySelector('.btn-validate');
+                validateBtn.disabled = true;
+                validateBtn.textContent = '🔄 Validando...';
+                
+                const response = await fetch('/api/professor/validate-code', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, verificationCode })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showValidationMessage(data.message, 'success');
+                    // Limpiar campos después del éxito
+                    document.getElementById('validationUsername').value = '';
+                    document.getElementById('validationCode').value = '';
+                    // Mostrar notificación también
+                    showNotification(data.message, 'success');
+                } else {
+                    showValidationMessage(data.message, 'error');
+                    // Limpiar solo el código para permitir reintento
+                    document.getElementById('validationCode').value = '';
+                    document.getElementById('validationCode').focus();
+                }
+                
+            } catch (error) {
+                console.error('Error al validar código:', error);
+                showValidationMessage('Error de conexión con el servidor', 'error');
+            } finally {
+                // Rehabilitar botón
+                const validateBtn = document.querySelector('.btn-validate');
+                validateBtn.disabled = false;
+                validateBtn.textContent = '🔍 Validar Código';
+            }
+        }
+
+        // Mostrar mensaje de validación
+        function showValidationMessage(message, type) {
+            const messageDiv = document.getElementById('validationMessage');
+            messageDiv.textContent = message;
+            messageDiv.className = `validation-message ${type}`;
+        }
+
+        // Agregar event listener para Enter en los campos de validación
+        document.addEventListener('DOMContentLoaded', function() {
+            const usernameInput = document.getElementById('validationUsername');
+            const codeInput = document.getElementById('validationCode');
+            
+            if (usernameInput) {
+                usernameInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        document.getElementById('validationCode').focus();
+                    }
+                });
+            }
+            
+            if (codeInput) {
+                codeInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        validateVerificationCode();
+                    }
+                });
+            }
+        });
+
+        // Inicializar la aplicación
+        document.addEventListener('DOMContentLoaded', function() {
+            showPendingRequests(); // Mostrar solicitudes pendientes por defecto
+            
+            // Actualizar automáticamente cada 5 segundos solo si estamos viendo pendientes
+            setInterval(() => {
+                updateStats(); // Siempre actualizar estadísticas
+                if (currentView === 'pending') {
+                    loadPendingRequests();
+                }
+                loadPendingCodes();
+            }, 5000);
+
+            // Primera carga de códigos pendientes
+            loadPendingCodes();
+        });
+    </script>
+</body>
+</html>
