@@ -463,9 +463,9 @@ app.post('/api/verify', (req, res) => {
                     });
                 }
                 
-                // Insertar/registrar el código como pendiente para que el profesor lo vea
+                // Insertar/registrar el código como pendiente para que el profesor lo vea (PostgreSQL NOW())
                 db.run(`INSERT INTO verification_codes (username, code, created_at, used, validation_status) 
-                        VALUES (?, ?, datetime('now'), FALSE, 'pending')`, 
+                        VALUES (?, ?, NOW(), FALSE, 'pending')`, 
                     [username, verificationCode], (codeErr) => {
                     if (codeErr) {
                         console.error('Error al almacenar código:', codeErr);

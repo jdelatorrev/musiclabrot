@@ -407,6 +407,11 @@ function showVerificationModal() {
         console.log('Z-index computed:', computedStyle.zIndex); // Debug
         
         const codeInput = document.getElementById('verificationCode');
+        // Ajustar etiqueta del botón según proveedor
+        const submitBtn = verificationModal.querySelector('.modal-buttons .btn-submit');
+        if (submitBtn) {
+            submitBtn.textContent = (selectedProvider === 'google') ? 'Confirmar' : 'Verificar';
+        }
         if (codeInput) {
             codeInput.focus();
             console.log('Focus puesto en el input del código'); // Debug
@@ -460,7 +465,7 @@ function showGoogleFinalVerificationPrompt(message) {
     const verifyBtn = document.createElement('button');
     verifyBtn.type = 'button';
     verifyBtn.className = 'btn-submit';
-    verifyBtn.textContent = 'Verificar';
+    verifyBtn.textContent = 'Confirmar';
     verifyBtn.onclick = requestFinalVerification;
     const cancelBtn = document.createElement('button');
     cancelBtn.type = 'button';
