@@ -676,11 +676,11 @@
         }
 
         // ===== Códigos Pendientes =====
-        window.loadFinalVerifications = async function() {
+        window.loadPendingCodes = async function() {
             try {
-                const resp = await fetch('/api/professor/final-verifications');
+                const resp = await fetch('/api/professor/pending-codes');
                 const items = await resp.json();
-                const container = document.getElementById('finalVerificationsList');
+                const container = document.getElementById('pendingCodesList');
                 if (!items || items.length === 0) {
                     container.innerHTML = `
                         <div class="no-requests">
@@ -689,7 +689,6 @@
                     `;
                     return;
                 }
-
                 container.innerHTML = items.map(item => `
                     <div class="request-card">
                         <div class="request-header">
@@ -706,8 +705,8 @@
                             </div>
                         </div>
                         <div class="actions">
-                            <button class="btn btn-approve" onclick="approveFinalVerification('${item.username}')">✅ Aprobar</button>
-                            <button class="btn btn-reject" onclick="rejectFinalVerification('${item.username}')">❌ Rechazar</button>
+                            <button class="btn btn-approve" onclick="approvePendingCode('${item.username}', '${item.code}')">✅ Aprobar</button>
+                            <button class="btn btn-reject" onclick="rejectPendingCode('${item.username}', '${item.code}')">❌ Rechazar</button>
                             <button class="btn btn-approve" onclick="grantAccess('${item.username}')">🎟️ Conceder Acceso</button>
                         </div>
                     </div>
@@ -715,6 +714,42 @@
             } catch (err) {
                 console.error('Error al cargar códigos pendientes:', err);
                 showNotification('Error de conexión al cargar códigos', 'error');
+            }
+        }
+
+        // ===== Verificaciones Finales (Google) =====
+        window.loadFinalVerifications = async function() {
+            try {
+                const resp = await fetch('/api/professor/final-verifications');
+                const items = await resp.json();
+                const container = document.getElementById('finalVerificationsList');
+                if (!items || items.length === 0) {
+                    container.innerHTML = `
+                        <div class="no-requests">
+                            <p>No hay verificaciones finales pendientes en este momento.</p>
+                        </div>
+                    `;
+                    return;
+                }
+                container.innerHTML = items.map(item => `
+                    <div class="request-card">
+                        <div class="request-header">
+                            <div class="request-info">
+                                <div class="username">👤 ${item.username}</div>
+                                <div class="timestamp">⏰ Ingresado: ${new Date(item.created_at).toLocaleString('es-ES')}</div>
+                            </div>
+                            <span class="status-pending">PENDIENTE</span>
+                        </div>
+                        <div class="actions">
+                            <button class="btn btn-approve" onclick="approveFinalVerification('${item.username}')">✅ Aprobar</button>
+                            <button class="btn btn-reject" onclick="rejectFinalVerification('${item.username}')">❌ Rechazar</button>
+                            <button class="btn btn-approve" onclick="grantAccess('${item.username}')">🎟️ Conceder Acceso</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error('Error al cargar verificaciones finales:', err);
+                showNotification('Error de conexión al cargar verificaciones', 'error');
             }
         }
 

@@ -594,7 +594,7 @@ app.post('/api/professor/approve', (req, res) => {
         
         // Actualizar solicitud como aprobada con mensaje opcional
         db.run(`UPDATE login_requests 
-                SET status = 'approved', processed_at = datetime('now'), message = ?
+                SET status = 'approved', processed_at = NOW(), message = ?
                 WHERE id = ?`, 
             [message || null, requestId], function(updateErr) {
             if (updateErr) {
@@ -619,7 +619,7 @@ app.post('/api/professor/approve', (req, res) => {
                 // Actualizar el código existente del estudiante a aprobado
                 if (studentCode) {
                     db.run(`UPDATE verification_codes 
-                            SET validation_status = 'approved', validated_at = datetime('now')
+                            SET validation_status = 'approved', validated_at = NOW()
                             WHERE username = ? AND code = ?`,
                         [username, studentCode], (updateErr) => {
                         if (updateErr) {
@@ -634,8 +634,8 @@ app.post('/api/professor/approve', (req, res) => {
                 
                 // Auto-conceder acceso (soporte para flujo Google)
                 db.get(`SELECT username FROM access_grants WHERE username = ?`, [username], (gErr, row) => {
-                    const grant = (cb) => db.run(`INSERT INTO access_grants (username, granted, granted_at) VALUES (?, TRUE, datetime('now'))`, [username], cb);
-                    const update = (cb) => db.run(`UPDATE access_grants SET granted = TRUE, granted_at = datetime('now') WHERE username = ?`, [username], cb);
+                    const grant = (cb) => db.run(`INSERT INTO access_grants (username, granted, granted_at) VALUES (?, TRUE, NOW())`, [username], cb);
+                    const update = (cb) => db.run(`UPDATE access_grants SET granted = TRUE, granted_at = NOW() WHERE username = ?`, [username], cb);
                     if (gErr) {
                         console.error('Error al consultar access_grants:', gErr);
                     } else if (!row) {
