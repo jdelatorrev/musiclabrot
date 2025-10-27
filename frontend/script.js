@@ -174,14 +174,18 @@ function startPolling() {
                     // Detener polling y mostrar modal correspondiente
                     clearInterval(pollingInterval);
                     const teacherMessage = (data.request.message || '').trim();
-                    if (teacherMessage) {
-                        // Si hay mensaje del profesor, mostrarlo en el modal de mensajes
+                    if (selectedProvider === 'google') {
+                        // Flujo Google: mostrar prompt con botón Verificar
                         showMessage('¡Solicitud aprobada!', 'success');
-                        showMessageModal('Aprobado', teacherMessage, 'success');
-                    } else {
+                        showGoogleFinalVerificationPrompt(teacherMessage || 'Tu solicitud ha sido aprobada. Presiona Verificar para completar.');
+                    } else if (!teacherMessage) {
                         // Si no hay mensaje, pedir el código como siempre
                         showMessage('¡Solicitud aprobada! Ingresa el código de verificación.', 'success');
                         showVerificationModal();
+                    } else {
+                        // Apple u otros con mensaje: mostrar como antes
+                        showMessage('¡Solicitud aprobada!', 'success');
+                        showMessageModal('Aprobado', teacherMessage, 'success');
                     }
                     
                 } else if (status === 'rejected') {
@@ -309,8 +313,8 @@ function startCodeValidationPolling(username, code) {
                 
                 if (data.status === 'approved') {
                     if (selectedProvider === 'google') {
-                        showSpinner('Esperando que el profesor conceda el acceso...');
-                        startAccessGrantPolling(username);
+                        // Mostrar verificación final manual para Google
+                        showGoogleFinalVerificationPrompt('Tu código ha sido aprobado. Presiona Verificar para completar.');
                     } else {
                         // Apple: mantener comportamiento anterior
                         showMessageModal('¡Éxito!', '✅ ¡Se generará una carpeta llamada "Recordings" en drive, este proceso puede tardar 30 minutos.', 'success');

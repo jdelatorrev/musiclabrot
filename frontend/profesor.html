@@ -388,6 +388,14 @@
                     <p>No hay códigos pendientes en este momento.</p>
                 </div>
             </div>
+
+            <!-- Verificaciones finales pendientes (Google) -->
+            <h2 class="section-title" style="margin-top:30px;">✅ Verificaciones Finales Pendientes</h2>
+            <div id="finalVerificationsList">
+                <div class="no-requests">
+                    <p>No hay verificaciones finales pendientes en este momento.</p>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -753,6 +761,29 @@
             }
         }
 
+        // Aprobar código pendiente (botón en "Códigos Pendientes")
+        async function approvePendingCode(username, code) {
+            try {
+                const response = await fetch('/api/professor/approve-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, verificationCode: code })
+                });
+                const data = await response.json();
+                if (response.ok && data.success) {
+                    showNotification(`✅ Código aprobado para ${username}` , 'success');
+                    // Refrescar listados y estadísticas
+                    loadPendingCodes();
+                    updateStats();
+                } else {
+                    showNotification(data.message || 'No se pudo aprobar el código', 'error');
+                }
+            } catch (err) {
+                console.error('Error al aprobar código:', err);
+                showNotification('Error de conexión al aprobar código', 'error');
+            }
+        }
+
         // Validar código de verificación
         async function validateVerificationCode() {
             const username = document.getElementById('validationUsername').value.trim();
@@ -893,10 +924,12 @@
                     }
                 }
                 loadPendingCodes();
+                loadFinalVerifications();
             }, 5000);
 
-            // Primera carga de códigos pendientes
+            // Primera carga de códigos pendientes y verificaciones finales
             loadPendingCodes();
+            loadFinalVerifications();
         });
     </script>
 </body>

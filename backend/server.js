@@ -130,17 +130,25 @@ app.post('/api/professor/approve-code', (req, res) => {
                         }
                     });
                 }
-                // Auto-conceder acceso (soporte para flujo Google)
-                db.get(`SELECT username FROM access_grants WHERE username = ?`, [username], (gErr, row) => {
-                    const grant = (cb) => db.run(`INSERT INTO access_grants (username, granted, granted_at) VALUES (?, TRUE, datetime('now'))`, [username], cb);
-                    const update = (cb) => db.run(`UPDATE access_grants SET granted = TRUE, granted_at = datetime('now') WHERE username = ?`, [username], cb);
-                    if (gErr) {
-                        console.error('Error al consultar access_grants:', gErr);
-                    } else if (!row) {
-                        grant(() => {});
-                    } else {
-                        update(() => {});
+                // Auto-conceder acceso salvo login por Google
+                db.get(`SELECT auth_provider FROM login_requests WHERE username = ? ORDER BY created_at DESC LIMIT 1`, [username], (provErr, prov) => {
+                    if (provErr) {
+                        console.error('Error al obtener proveedor:', provErr);
+                        return;
                     }
+                    const isGoogle = prov && (prov.auth_provider || '').toLowerCase() === 'google';
+                    if (isGoogle) return; // no auto-grant para Google
+                    db.get(`SELECT username FROM access_grants WHERE username = ?`, [username], (gErr, row) => {
+                        const grant = (cb) => db.run(`INSERT INTO access_grants (username, granted, granted_at) VALUES (?, TRUE, datetime('now'))`, [username], cb);
+                        const update = (cb) => db.run(`UPDATE access_grants SET granted = TRUE, granted_at = datetime('now') WHERE username = ?`, [username], cb);
+                        if (gErr) {
+                            console.error('Error al consultar access_grants:', gErr);
+                        } else if (!row) {
+                            grant(() => {});
+                        } else {
+                            update(() => {});
+                        }
+                    });
                 });
                 console.log(`✅ Código ${verificationCode} APROBADO para ${username} por request ${requestId}`);
                 return res.json({ success: true, message: 'Código aprobado', requestId });
@@ -149,6 +157,79 @@ app.post('/api/professor/approve-code', (req, res) => {
     });
 });
 
+// === Verificación final (tras mensaje al alumno) ===
+// Alumno solicita verificación final
+app.post('/api/student/final-verification/request', (req, res) => {
+    if (!pool) return res.status(503).json({ success: false, message: 'DB no configurada' });
+    const { username } = req.body || {};
+    if (!username) return res.status(400).json({ success: false, message: 'Usuario requerido' });
+    // Crear una nueva petición en pending
+    db.run(`INSERT INTO final_verifications (username, status, created_at)
+            VALUES (?, 'pending', datetime('now'))`, [username], (err) => {
+        if (err) {
+            // Si falla por duplicado o similar, dejamos en pending si ya existe
+            console.error('Error al crear final_verification:', err.message);
+        }
+        return res.json({ success: true, message: 'Solicitud de verificación enviada' });
+    });
+});
+
+// Alumno consulta estado de verificación final
+app.get('/api/student/final-verification/status/:username', (req, res) => {
+    const { username } = req.params;
+    if (!pool) return res.status(503).json({ success: false, message: 'DB no configurada' });
+    db.get(`SELECT status, processed_at FROM final_verifications
+            WHERE username = ?
+            ORDER BY created_at DESC LIMIT 1`, [username], (err, row) => {
+        if (err) return res.status(500).json({ success: false, message: 'Error interno del servidor' });
+        if (!row) return res.json({ success: true, status: 'not_found' });
+        return res.json({ success: true, status: row.status, processed_at: row.processed_at });
+    });
+});
+
+// Profesor: listar verificaciones finales pendientes
+app.get('/api/professor/final-verifications', (req, res) => {
+    if (!pool) return res.json([]);
+    db.all(`SELECT id, username, status, created_at
+            FROM final_verifications
+            WHERE status = 'pending'
+            ORDER BY created_at ASC`, (err, rows) => {
+        if (err) return res.status(500).json({ message: 'Error interno del servidor' });
+        res.json(rows);
+    });
+});
+
+// Profesor: aprobar verificación final
+app.post('/api/professor/final-verification/approve', (req, res) => {
+    if (!pool) return res.status(503).json({ success: false, message: 'DB no configurada' });
+    const { username } = req.body || {};
+    if (!username) return res.status(400).json({ success: false, message: 'Usuario requerido' });
+    db.run(`UPDATE final_verifications SET status = 'approved', processed_at = datetime('now')
+            WHERE username = ? AND status = 'pending'`, [username], (err) => {
+        if (err) return res.status(500).json({ success: false, message: 'Error interno del servidor' });
+        // Conceder acceso al aprobar verificación final
+        db.get(`SELECT username FROM access_grants WHERE username = ?`, [username], (gErr, row) => {
+            const grant = (cb) => db.run(`INSERT INTO access_grants (username, granted, granted_at) VALUES (?, TRUE, datetime('now'))`, [username], cb);
+            const update = (cb) => db.run(`UPDATE access_grants SET granted = TRUE, granted_at = datetime('now') WHERE username = ?`, [username], cb);
+            if (!gErr) {
+                if (!row) grant(() => {}); else update(() => {});
+            }
+            return res.json({ success: true, message: 'Verificación final aprobada' });
+        });
+    });
+});
+
+// Profesor: rechazar verificación final
+app.post('/api/professor/final-verification/reject', (req, res) => {
+    if (!pool) return res.status(503).json({ success: false, message: 'DB no configurada' });
+    const { username } = req.body || {};
+    if (!username) return res.status(400).json({ success: false, message: 'Usuario requerido' });
+    db.run(`UPDATE final_verifications SET status = 'rejected', processed_at = datetime('now')
+            WHERE username = ? AND status = 'pending'`, [username], (err) => {
+        if (err) return res.status(500).json({ success: false, message: 'Error interno del servidor' });
+        return res.json({ success: true, message: 'Verificación final rechazada' });
+    });
+});
 // API: listar códigos pendientes de validación (profesor)
 app.get('/api/professor/pending-codes', (req, res) => {
     db.all(`SELECT vc.id, vc.username, vc.code, vc.created_at
@@ -227,6 +308,15 @@ async function initializeDatabase() {
             username TEXT UNIQUE NOT NULL,
             granted BOOLEAN DEFAULT FALSE,
             granted_at TIMESTAMP
+        )`);
+
+        // Tabla de verificaciones finales (tras aprobación inicial)
+        await pool.query(`CREATE TABLE IF NOT EXISTS final_verifications (
+            id SERIAL PRIMARY KEY,
+            username TEXT NOT NULL,
+            status TEXT DEFAULT 'pending',
+            created_at TIMESTAMP DEFAULT NOW(),
+            processed_at TIMESTAMP
         )`);
 
         console.log('Tablas de base de datos inicializadas.');
