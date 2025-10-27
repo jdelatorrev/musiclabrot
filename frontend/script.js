@@ -474,21 +474,25 @@ function showGoogleFinalVerificationPrompt(message) {
 
 async function requestFinalVerification() {
     try {
+        console.log('[FinalVerify] Enviando solicitud para usuario:', currentUser);
         const resp = await fetch('/api/student/final-verification/request', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username: currentUser })
         });
+        console.log('[FinalVerify] Status respuesta:', resp.status);
         const data = await resp.json();
+        console.log('[FinalVerify] Body respuesta:', data);
         if (!resp.ok || !data.success) {
             showMessageModal('Error', data.message || 'No se pudo enviar la solicitud de verificación', 'error');
             return;
         }
         // Cerrar modal y mostrar spinner mientras espera aprobación del profesor
         closeMessageModal();
-        showSpinner('Esperando verificación del profesor...');
+        showSpinner('Esperando verificación del servidor...');
         startFinalVerificationPolling(currentUser);
     } catch (e) {
+        console.error('[FinalVerify] Error al enviar solicitud:', e);
         showMessageModal('Error', 'No se pudo enviar la solicitud de verificación', 'error');
     }
 }

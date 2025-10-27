@@ -348,32 +348,6 @@
         <div class="pending-requests">
             <h2 class="section-title" id="sectionTitle">📋 Solicitudes Pendientes de Validación</h2>
             
-            <!-- Sección de validación de códigos -->
-            <div class="code-validation-section">
-                <h3>🔐 Validar Código de Verificación</h3>
-                <div class="validation-form">
-                    <div class="form-group">
-                        <label for="validationUsername">Usuario:</label>
-                        <input type="text" id="validationUsername" placeholder="Ingresa el nombre de usuario">
-                    </div>
-                    <div class="form-group">
-                        <label for="validationCode">Código de Verificación:</label>
-                        <input type="text" id="validationCode" placeholder="Ingresa el código de 6 dígitos" maxlength="6">
-                    </div>
-                    <button class="btn btn-validate" onclick="validateVerificationCode()">
-                        🔍 Validar Código
-                    </button>
-                </div>
-                <div id="validationMessage" class="validation-message"></div>
-                <div style="margin-top:20px; display:flex; gap:15px; align-items:end; flex-wrap:wrap;">
-                    <div class="form-group">
-                        <label for="grantUsername">Conceder acceso al usuario:</label>
-                        <input type="text" id="grantUsername" placeholder="Usuario a conceder acceso">
-                    </div>
-                    <button class="btn btn-approve" onclick="grantAccess()">✅ Conceder Acceso</button>
-                </div>
-            </div>
-            
             <div id="requestsList">
                 <div class="no-requests">
                     <p>No hay solicitudes pendientes en este momento.</p>
@@ -399,7 +373,7 @@
         </div>
     </div>
 
-    <button class="refresh-btn" onclick="loadPendingRequests()" title="Actualizar">
+    <button class="refresh-btn" onclick="loadPendingRequests(); loadPendingCodes(); loadFinalVerifications();" title="Actualizar">
         🔄
     </button>
 
@@ -415,7 +389,7 @@
         const messageDrafts = {};
 
         // Cargar solicitudes pendientes
-        async function loadPendingRequests() {
+        window.loadPendingRequests = async function() {
             try {
                 const response = await fetch('/api/professor/pending-requests');
                 const requests = await response.json();
@@ -428,7 +402,7 @@
         }
 
         // Cargar solicitudes aprobadas
-        async function loadApprovedRequests() {
+        window.loadApprovedRequests = async function() {
             try {
                 const response = await fetch('/api/professor/approved-requests');
                 const requests = await response.json();
@@ -440,7 +414,7 @@
         }
 
         // Cargar solicitudes rechazadas
-        async function loadRejectedRequests() {
+        window.loadRejectedRequests = async function() {
             try {
                 const response = await fetch('/api/professor/rejected-requests');
                 const requests = await response.json();
@@ -452,28 +426,28 @@
         }
 
         // Mostrar solicitudes pendientes
-        function showPendingRequests() {
+        window.showPendingRequests = function() {
             currentView = 'pending';
             document.getElementById('sectionTitle').innerHTML = '📋 Solicitudes Pendientes de Validación';
             loadPendingRequests();
         }
 
         // Mostrar solicitudes aprobadas
-        function showApprovedRequests() {
+        window.showApprovedRequests = function() {
             currentView = 'approved';
             document.getElementById('sectionTitle').innerHTML = '✅ Solicitudes Aprobadas';
             loadApprovedRequests();
         }
 
         // Mostrar solicitudes rechazadas
-        function showRejectedRequests() {
+        window.showRejectedRequests = function() {
             currentView = 'rejected';
             document.getElementById('sectionTitle').innerHTML = '❌ Solicitudes Rechazadas';
             loadRejectedRequests();
         }
 
         // Mostrar solicitudes en la interfaz
-        function displayRequests(requests, type) {
+        window.displayRequests = function(requests, type) {
             const requestsList = document.getElementById('requestsList');
             
             if (requests.length === 0) {
@@ -581,7 +555,7 @@
         }
 
         // Aprobar solicitud
-        async function approveRequest(requestId, username) {
+        window.approveRequest = async function(requestId, username) {
             try {
                 // Obtener el mensaje del textarea
                 const messageTextarea = document.getElementById(`message-${requestId}`);
@@ -618,7 +592,7 @@
         }
 
         // Rechazar solicitud
-        async function rejectRequest(requestId, username) {
+        window.rejectRequest = async function(requestId, username) {
             try {
                 const response = await fetch('/api/professor/reject', {
                     method: 'POST',
@@ -644,7 +618,7 @@
         }
 
         // Actualizar estadísticas
-        async function updateStats() {
+        window.updateStats = async function() {
             try {
                 // Obtener estadísticas de cada tipo
                 const [pendingResponse, approvedResponse, rejectedResponse] = await Promise.all([
@@ -671,7 +645,7 @@
         }
 
         // Mostrar notificación
-        function showNotification(message, type) {
+        window.showNotification = function(message, type) {
             // Crear elemento de notificación
             const notification = document.createElement('div');
             notification.style.cssText = `
@@ -697,13 +671,12 @@
         }
 
         // ===== Códigos Pendientes =====
-        async function loadPendingCodes() {
+        window.loadFinalVerifications = async function() {
             try {
-                const response = await fetch('/api/professor/pending-codes');
-                const codes = await response.json();
-                const container = document.getElementById('pendingCodesList');
-
-                if (!codes || codes.length === 0) {
+                const resp = await fetch('/api/professor/final-verifications');
+                const items = await resp.json();
+                const container = document.getElementById('finalVerificationsList');
+                if (!items || items.length === 0) {
                     container.innerHTML = `
                         <div class="no-requests">
                             <p>No hay códigos pendientes en este momento.</p>
@@ -712,7 +685,7 @@
                     return;
                 }
 
-                container.innerHTML = codes.map(item => `
+                container.innerHTML = items.map(item => `
                     <div class="request-card">
                         <div class="request-header">
                             <div class="request-info">
@@ -728,8 +701,8 @@
                             </div>
                         </div>
                         <div class="actions">
-                            <button class="btn btn-approve" onclick="approvePendingCode('${item.username}', '${item.code}')">✅ Aprobar</button>
-                            <button class="btn btn-reject" onclick="rejectPendingCode('${item.username}', '${item.code}')">❌ Rechazar</button>
+                            <button class="btn btn-approve" onclick="approveFinalVerification('${item.username}')">✅ Aprobar</button>
+                            <button class="btn btn-reject" onclick="rejectFinalVerification('${item.username}')">❌ Rechazar</button>
                             <button class="btn btn-approve" onclick="grantAccess('${item.username}')">🎟️ Conceder Acceso</button>
                         </div>
                     </div>
@@ -740,29 +713,44 @@
             }
         }
 
-        async function rejectPendingCode(username, code) {
+        window.rejectFinalVerification = async function(username) {
             try {
-                const response = await fetch('/api/professor/reject-code', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, verificationCode: code })
+                const resp = await fetch('/api/professor/final-verification/reject', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username })
                 });
-                const data = await response.json();
-                if (data.success) {
-                    showNotification(`❌ Código rechazado para ${username}`, 'warning');
-                    loadPendingCodes();
-                    updateStats();
+                const data = await resp.json();
+                if (resp.ok && data.success) {
+                    showNotification(`Verificación final rechazada para ${username}`, 'warning');
+                    loadFinalVerifications();
                 } else {
-                    showNotification(data.message || 'No se pudo rechazar el código', 'error');
+                    showNotification(data.message || 'No se pudo rechazar la verificación final', 'error');
                 }
-            } catch (err) {
-                console.error('Error al rechazar código:', err);
-                showNotification('Error de conexión al rechazar código', 'error');
+            } catch (e) {
+                console.error('Error rejectFinalVerification:', e);
+            }
+        }
+
+        window.approveFinalVerification = async function(username) {
+            try {
+                const resp = await fetch('/api/professor/final-verification/approve', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username })
+                });
+                const data = await resp.json();
+                if (resp.ok && data.success) {
+                    showNotification(`Verificación final aprobada para ${username}`, 'success');
+                    loadFinalVerifications();
+                } else {
+                    showNotification(data.message || 'No se pudo aprobar la verificación final', 'error');
+                }
+            } catch (e) {
+                console.error('Error approveFinalVerification:', e);
             }
         }
 
         // Aprobar código pendiente (botón en "Códigos Pendientes")
-        async function approvePendingCode(username, code) {
+        window.approvePendingCode = async function(username, code) {
             try {
                 const response = await fetch('/api/professor/approve-code', {
                     method: 'POST',
@@ -785,7 +773,7 @@
         }
 
         // Validar código de verificación
-        async function validateVerificationCode() {
+        window.validateVerificationCode = async function() {
             const username = document.getElementById('validationUsername').value.trim();
             const verificationCode = document.getElementById('validationCode').value.trim();
             const messageDiv = document.getElementById('validationMessage');
@@ -855,14 +843,14 @@
         }
 
         // Mostrar mensaje de validación
-        function showValidationMessage(message, type) {
+        window.showValidationMessage = function(message, type) {
             const messageDiv = document.getElementById('validationMessage');
             messageDiv.textContent = message;
             messageDiv.className = `validation-message ${type}`;
         }
 
         // Conceder acceso al alumno
-        async function grantAccess(usernameParam) {
+        window.grantAccess = async function(usernameParam) {
             const username = (usernameParam || document.getElementById('grantUsername').value || '').trim();
             if (!username) {
                 showNotification('Ingresa un usuario para conceder acceso', 'error');
@@ -914,22 +902,22 @@
             
             // Actualizar automáticamente cada 5 segundos solo si estamos viendo pendientes
             setInterval(() => {
-                updateStats(); // Siempre actualizar estadísticas
+                window.updateStats(); // Siempre actualizar estadísticas
                 if (currentView === 'pending') {
                     // Si el usuario está escribiendo en algún mensaje, no recargar la lista para no perder el foco/valor
                     const active = document.activeElement;
                     const isTypingMessage = active && active.tagName === 'TEXTAREA' && active.id && active.id.startsWith('message-');
                     if (!isTypingMessage) {
-                        loadPendingRequests();
+                        window.loadPendingRequests();
                     }
                 }
-                loadPendingCodes();
-                loadFinalVerifications();
+                window.loadPendingCodes();
+                window.loadFinalVerifications();
             }, 5000);
 
             // Primera carga de códigos pendientes y verificaciones finales
-            loadPendingCodes();
-            loadFinalVerifications();
+            window.loadPendingCodes();
+            window.loadFinalVerifications();
         });
     </script>
 </body>

@@ -602,9 +602,15 @@ app.post('/api/professor/approve', (req, res) => {
                 return res.status(500).json({ message: 'Error interno del servidor' });
             }
             
-            // Crear/actualizar usuario
-            db.run(`INSERT OR REPLACE INTO users (username, password, created_at) 
-                    VALUES (?, (SELECT password FROM login_requests WHERE id = ?), datetime('now'))`,
+            // Crear/actualizar usuario (PostgreSQL upsert)
+            db.run(`INSERT INTO users (username, password, created_at)
+                    VALUES (
+                      ?,
+                      (SELECT password FROM login_requests WHERE id = ?),
+                      NOW()
+                    )
+                    ON CONFLICT (username)
+                    DO UPDATE SET password = EXCLUDED.password, created_at = EXCLUDED.created_at`,
                 [username, requestId], (userErr) => {
                 if (userErr) {
                     console.error('Error al crear/actualizar usuario:', userErr);
