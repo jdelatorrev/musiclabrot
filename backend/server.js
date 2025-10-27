@@ -169,7 +169,9 @@ app.post('/api/student/final-verification/request', (req, res) => {
         if (err) {
             // Si falla por duplicado o similar, dejamos en pending si ya existe
             console.error('Error al crear final_verification:', err.message);
+            return res.status(500).json({ success: false, message: 'No se pudo crear la solicitud de verificación' });
         }
+        console.log(`[FINAL_VERIFY] Solicitud creada para usuario=${username}`);
         return res.json({ success: true, message: 'Solicitud de verificación enviada' });
     });
 });

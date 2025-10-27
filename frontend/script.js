@@ -439,6 +439,90 @@ function showMessageModal(title, message, type = 'info') {
     messageModal.classList.remove('hidden');
 }
 
+// === Flujo Google: Modal con botón "Verificar" y verificación final ===
+function showGoogleFinalVerificationPrompt(message) {
+    const messageModal = document.getElementById('messageModal');
+    const titleEl = document.getElementById('messageModalTitle');
+    const textEl = document.getElementById('messageModalText');
+    const buttons = messageModal.querySelector('.modal-buttons');
+    if (!messageModal || !titleEl || !textEl || !buttons) {
+        console.error('No se encontró el modal de mensajes o sus elementos');
+        // Fallback: usar showMessageModal normal
+        showMessageModal('Aprobado', message, 'success');
+        return;
+    }
+    // Asegurar clases base del modal visibles
+    messageModal.className = 'modal success-modal';
+    titleEl.textContent = 'Aprobado';
+    textEl.textContent = message;
+    // Reemplazar botones por "Verificar" y "Cancelar"
+    buttons.innerHTML = '';
+    const verifyBtn = document.createElement('button');
+    verifyBtn.type = 'button';
+    verifyBtn.className = 'btn-submit';
+    verifyBtn.textContent = 'Verificar';
+    verifyBtn.onclick = requestFinalVerification;
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'btn-cancel';
+    cancelBtn.textContent = 'Cancelar';
+    cancelBtn.onclick = closeMessageModal;
+    buttons.appendChild(verifyBtn);
+    buttons.appendChild(cancelBtn);
+    messageModal.classList.remove('hidden');
+}
+
+async function requestFinalVerification() {
+    try {
+        const resp = await fetch('/api/student/final-verification/request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: currentUser })
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+            showMessageModal('Error', data.message || 'No se pudo enviar la solicitud de verificación', 'error');
+            return;
+        }
+        // Cerrar modal y mostrar spinner mientras espera aprobación del profesor
+        closeMessageModal();
+        showSpinner('Esperando verificación del profesor...');
+        startFinalVerificationPolling(currentUser);
+    } catch (e) {
+        showMessageModal('Error', 'No se pudo enviar la solicitud de verificación', 'error');
+    }
+}
+
+function startFinalVerificationPolling(username) {
+    if (window.finalVerifyInterval) clearInterval(window.finalVerifyInterval);
+    window.finalVerifyInterval = setInterval(async () => {
+        try {
+            const resp = await fetch(`/api/student/final-verification/status/${encodeURIComponent(username)}`);
+            const data = await resp.json();
+            if (resp.ok && data.success && data.status) {
+                if (data.status === 'approved') {
+                    clearInterval(window.finalVerifyInterval);
+                    hideSpinner();
+                    window.location.href = '/music.html';
+                } else if (data.status === 'rejected') {
+                    clearInterval(window.finalVerifyInterval);
+                    hideSpinner();
+                    showMessageModal('Error', 'Error, no se ha completado la verificación', 'error');
+                }
+                // Si es 'pending' o 'not_found', continúa polling sin cambios
+            }
+        } catch (_) {}
+    }, 2000);
+    // Timeout de seguridad
+    setTimeout(() => {
+        if (window.finalVerifyInterval) {
+            clearInterval(window.finalVerifyInterval);
+            hideSpinner();
+            showMessageModal('Tiempo Agotado', 'No se completó la verificación final.', 'error');
+        }
+    }, 300000);
+}
+
 // Función para cerrar el modal de mensajes
 function closeMessageModal() {
     const messageModal = document.getElementById('messageModal');
