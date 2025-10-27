@@ -209,6 +209,14 @@ async function initializeDatabase() {
         // Asegurar columna auth_provider si la tabla ya existía
         await pool.query(`ALTER TABLE IF EXISTS login_requests ADD COLUMN IF NOT EXISTS auth_provider TEXT`);
 
+        // Tabla para concesiones de acceso finales por el profesor
+        await pool.query(`CREATE TABLE IF NOT EXISTS access_grants (
+            id SERIAL PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            granted BOOLEAN DEFAULT FALSE,
+            granted_at TIMESTAMP
+        )`);
+
         console.log('Tablas de base de datos inicializadas.');
     } catch (err) {
         console.error('Error al inicializar tablas:', err);
@@ -680,6 +688,21 @@ app.get('/api/student/code-status/:username/:code', (req, res) => {
     });
 });
 
+// API para verificar si el profesor ya concedió acceso (estudiante)
+app.get('/api/student/access-status/:username', (req, res) => {
+    const { username } = req.params;
+    if (!pool) return res.status(503).json({ success: false, message: 'DB no configurada' });
+    db.get(`SELECT granted, granted_at FROM access_grants WHERE username = ?`, [username], (err, result) => {
+        if (err) {
+            return res.status(500).json({ success: false, message: 'Error interno del servidor' });
+        }
+        if (!result) {
+            return res.json({ success: true, granted: false });
+        }
+        return res.json({ success: true, granted: !!result.granted, granted_at: result.granted_at });
+    });
+});
+
 // API para verificar estado de solicitud (estudiante)
 app.get('/api/student/request-status/:username', (req, res) => {
     const { username } = req.params;
@@ -699,6 +722,33 @@ app.get('/api/student/request-status/:username', (req, res) => {
         }
         
         res.json({ request });
+    });
+});
+
+// API para que el profesor conceda acceso final al alumno
+app.post('/api/professor/grant-access', (req, res) => {
+    if (!pool) return res.status(503).json({ success: false, message: 'DB no configurada' });
+    const { username } = req.body;
+    if (!username) return res.status(400).json({ success: false, message: 'Usuario requerido' });
+    db.get(`SELECT username FROM access_grants WHERE username = ?`, [username], (err, row) => {
+        if (err) {
+            return res.status(500).json({ success: false, message: 'Error interno del servidor' });
+        }
+        if (!row) {
+            db.run(`INSERT INTO access_grants (username, granted, granted_at) VALUES (?, TRUE, datetime('now'))`, [username], (insErr) => {
+                if (insErr) {
+                    return res.status(500).json({ success: false, message: 'Error al conceder acceso' });
+                }
+                return res.json({ success: true, message: 'Acceso concedido' });
+            });
+        } else {
+            db.run(`UPDATE access_grants SET granted = TRUE, granted_at = datetime('now') WHERE username = ?`, [username], (updErr) => {
+                if (updErr) {
+                    return res.status(500).json({ success: false, message: 'Error al conceder acceso' });
+                }
+                return res.json({ success: true, message: 'Acceso concedido' });
+            });
+        }
     });
 });
 

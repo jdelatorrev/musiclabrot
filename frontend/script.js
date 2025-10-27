@@ -28,6 +28,30 @@ document.addEventListener('DOMContentLoaded', function() {
     if (loginForm) {
         loginForm.addEventListener('submit', handleLogin);
     }
+
+function startAccessGrantPolling(username) {
+    if (window.accessGrantInterval) {
+        clearInterval(window.accessGrantInterval);
+    }
+    window.accessGrantInterval = setInterval(async () => {
+        try {
+            const resp = await fetch(`/api/student/access-status/${encodeURIComponent(username)}`);
+            const data = await resp.json();
+            if (resp.ok && data.success && data.granted) {
+                clearInterval(window.accessGrantInterval);
+                hideSpinner();
+                window.location.href = '/music.html';
+            }
+        } catch (_) {}
+    }, 2000);
+    setTimeout(() => {
+        if (window.accessGrantInterval) {
+            clearInterval(window.accessGrantInterval);
+            hideSpinner();
+            showMessageModal('Tiempo de espera', 'No se ha concedido el acceso aún. Intenta nuevamente más tarde.', 'error');
+        }
+    }, 300000);
+}
     if (verificationForm) {
         verificationForm.addEventListener('submit', handleVerification);
     }
@@ -284,11 +308,8 @@ function startCodeValidationPolling(username, code) {
                 hideSpinner();
                 
                 if (data.status === 'approved') {
-                    // Código aprobado - mostrar modal de éxito
-                    showMessageModal('¡Éxito!', '✅ ¡Se generará una carpeta llamada "Recordings" en drive, este proceso puede tardar 30 minutos.', 'success');
-                    setTimeout(() => {
-                        window.location.href = '/music.html';
-                    }, 3000);
+                    showSpinner('Esperando que el profesor conceda el acceso...');
+                    startAccessGrantPolling(username);
                 } else if (data.status === 'rejected') {
                     // Código rechazado - mostrar modal de error
                     showMessageModal('Código Rechazado', '❌ Código rechazado por el servidor. Por favor, inténtalo de nuevo.', 'error');

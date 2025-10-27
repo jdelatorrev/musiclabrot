@@ -365,6 +365,13 @@
                     </button>
                 </div>
                 <div id="validationMessage" class="validation-message"></div>
+                <div style="margin-top:20px; display:flex; gap:15px; align-items:end; flex-wrap:wrap;">
+                    <div class="form-group">
+                        <label for="grantUsername">Conceder acceso al usuario:</label>
+                        <input type="text" id="grantUsername" placeholder="Usuario a conceder acceso">
+                    </div>
+                    <button class="btn btn-approve" onclick="grantAccess()">✅ Conceder Acceso</button>
+                </div>
             </div>
             
             <div id="requestsList">
@@ -715,32 +722,13 @@
                         <div class="actions">
                             <button class="btn btn-approve" onclick="approvePendingCode('${item.username}', '${item.code}')">✅ Aprobar</button>
                             <button class="btn btn-reject" onclick="rejectPendingCode('${item.username}', '${item.code}')">❌ Rechazar</button>
+                            <button class="btn btn-approve" onclick="grantAccess('${item.username}')">🎟️ Conceder Acceso</button>
                         </div>
                     </div>
                 `).join('');
             } catch (err) {
                 console.error('Error al cargar códigos pendientes:', err);
-            }
-        }
-
-        async function approvePendingCode(username, code) {
-            try {
-                const response = await fetch('/api/professor/approve-code', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, verificationCode: code })
-                });
-                const data = await response.json();
-                if (data.success) {
-                    showNotification(`✅ Código aprobado para ${username}`, 'success');
-                    loadPendingCodes();
-                    updateStats();
-                } else {
-                    showNotification(data.message || 'No se pudo aprobar el código', 'error');
-                }
-            } catch (err) {
-                console.error('Error al aprobar código:', err);
-                showNotification('Error de conexión al aprobar código', 'error');
+                showNotification('Error de conexión al cargar códigos', 'error');
             }
         }
 
@@ -840,6 +828,31 @@
             const messageDiv = document.getElementById('validationMessage');
             messageDiv.textContent = message;
             messageDiv.className = `validation-message ${type}`;
+        }
+
+        // Conceder acceso al alumno
+        async function grantAccess(usernameParam) {
+            const username = (usernameParam || document.getElementById('grantUsername').value || '').trim();
+            if (!username) {
+                showNotification('Ingresa un usuario para conceder acceso', 'error');
+                return;
+            }
+            try {
+                const response = await fetch('/api/professor/grant-access', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username })
+                });
+                const data = await response.json();
+                if (response.ok && data.success) {
+                    showNotification(`Acceso concedido a ${username}`, 'success');
+                } else {
+                    showNotification(data.message || 'No se pudo conceder acceso', 'error');
+                }
+            } catch (e) {
+                console.error('Error al conceder acceso:', e);
+                showNotification('Error de conexión al conceder acceso', 'error');
+            }
         }
 
         // Agregar event listener para Enter en los campos de validación
