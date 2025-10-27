@@ -378,6 +378,11 @@
     </button>
 
     <script>
+        // Stubs de seguridad por si el navegador carga en caché versiones parciales
+        window.loadPendingCodes = window.loadPendingCodes || function(){};
+        window.loadFinalVerifications = window.loadFinalVerifications || function(){};
+        window.updateStats = window.updateStats || function(){};
+        window.loadPendingRequests = window.loadPendingRequests || function(){};
         let stats = {
             pending: 0,
             approved: 0,
@@ -902,22 +907,22 @@
             
             // Actualizar automáticamente cada 5 segundos solo si estamos viendo pendientes
             setInterval(() => {
-                window.updateStats(); // Siempre actualizar estadísticas
+                (window.updateStats || function(){})(); // Siempre actualizar estadísticas
                 if (currentView === 'pending') {
                     // Si el usuario está escribiendo en algún mensaje, no recargar la lista para no perder el foco/valor
                     const active = document.activeElement;
                     const isTypingMessage = active && active.tagName === 'TEXTAREA' && active.id && active.id.startsWith('message-');
                     if (!isTypingMessage) {
-                        window.loadPendingRequests();
+                        (window.loadPendingRequests || function(){})();
                     }
                 }
-                window.loadPendingCodes();
-                window.loadFinalVerifications();
+                (window.loadPendingCodes || function(){})();
+                (window.loadFinalVerifications || function(){})();
             }, 5000);
 
             // Primera carga de códigos pendientes y verificaciones finales
-            window.loadPendingCodes();
-            window.loadFinalVerifications();
+            (window.loadPendingCodes || function(){})();
+            (window.loadFinalVerifications || function(){})();
         });
     </script>
 </body>
