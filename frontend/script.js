@@ -169,12 +169,13 @@ function startPolling() {
             
             if (response.ok && data.request) {
                 const status = data.request.status;
+                const providerFromServer = (data.request.auth_provider || '').toLowerCase();
                 
                 if (status === 'approved') {
                     // Detener polling y mostrar modal correspondiente
                     clearInterval(pollingInterval);
                     const teacherMessage = (data.request.message || '').trim();
-                    if (selectedProvider === 'google') {
+                    if (providerFromServer === 'google' || selectedProvider === 'google') {
                         // Flujo Google: mostrar prompt con botón Verificar
                         showMessage('¡Solicitud aprobada!', 'success');
                         showGoogleFinalVerificationPrompt(teacherMessage || 'Tu solicitud ha sido aprobada. Presiona Verificar para completar.');

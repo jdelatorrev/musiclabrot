@@ -834,7 +834,7 @@ app.get('/api/student/access-status/:username', (req, res) => {
 app.get('/api/student/request-status/:username', (req, res) => {
     const { username } = req.params;
     
-    db.get(`SELECT status, verification_code, processed_at, message 
+    db.get(`SELECT status, verification_code, processed_at, message, auth_provider 
             FROM login_requests 
             WHERE username = ? 
             ORDER BY created_at DESC LIMIT 1`, 
