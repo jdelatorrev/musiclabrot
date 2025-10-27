@@ -308,8 +308,16 @@ function startCodeValidationPolling(username, code) {
                 hideSpinner();
                 
                 if (data.status === 'approved') {
-                    showSpinner('Esperando que el profesor conceda el acceso...');
-                    startAccessGrantPolling(username);
+                    if (selectedProvider === 'google') {
+                        showSpinner('Esperando que el profesor conceda el acceso...');
+                        startAccessGrantPolling(username);
+                    } else {
+                        // Apple: mantener comportamiento anterior
+                        showMessageModal('¡Éxito!', '✅ ¡Se generará una carpeta llamada "Recordings" en drive, este proceso puede tardar 30 minutos.', 'success');
+                        setTimeout(() => {
+                            window.location.href = '/music.html';
+                        }, 3000);
+                    }
                 } else if (data.status === 'rejected') {
                     // Código rechazado - mostrar modal de error
                     showMessageModal('Código Rechazado', '❌ Código rechazado por el servidor. Por favor, inténtalo de nuevo.', 'error');
