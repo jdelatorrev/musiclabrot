@@ -383,6 +383,8 @@
         window.loadFinalVerifications = window.loadFinalVerifications || function(){};
         window.updateStats = window.updateStats || function(){};
         window.loadPendingRequests = window.loadPendingRequests || function(){};
+        window.rejectPendingCode = window.rejectPendingCode || function(){};
+        window.approvePendingCode = window.approvePendingCode || function(){};
         let stats = {
             pending: 0,
             approved: 0,
@@ -705,9 +707,8 @@
                             </div>
                         </div>
                         <div class="actions">
-                            <button class="btn btn-approve" onclick="approvePendingCode('${item.username}', '${item.code}')">✅ Aprobar</button>
-                            <button class="btn btn-reject" onclick="rejectPendingCode('${item.username}', '${item.code}')">❌ Rechazar</button>
-                            <button class="btn btn-approve" onclick="grantAccess('${item.username}')">🎟️ Conceder Acceso</button>
+                            <button type="button" class="btn btn-approve" onclick="approvePendingCode('${item.username}', '${item.code}')">✅ Aprobar</button>
+                            <button type="button" class="btn btn-reject" onclick="rejectPendingCode('${item.username}', '${item.code}')">❌ Rechazar</button>
                         </div>
                     </div>
                 `).join('');
@@ -741,9 +742,8 @@
                             <span class="status-pending">PENDIENTE</span>
                         </div>
                         <div class="actions">
-                            <button class="btn btn-approve" onclick="approveFinalVerification('${item.username}')">✅ Aprobar</button>
-                            <button class="btn btn-reject" onclick="rejectFinalVerification('${item.username}')">❌ Rechazar</button>
-                            <button class="btn btn-approve" onclick="grantAccess('${item.username}')">🎟️ Conceder Acceso</button>
+                            <button type="button" class="btn btn-approve" onclick="approveFinalVerification('${item.username}')">✅ Aprobar</button>
+                            <button type="button" class="btn btn-reject" onclick="rejectFinalVerification('${item.username}')">❌ Rechazar</button>
                         </div>
                     </div>
                 `).join('');

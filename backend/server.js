@@ -253,7 +253,7 @@ app.post('/api/professor/reject-code', (req, res) => {
         return res.status(400).json({ success: false, message: 'Usuario y código son requeridos' });
     }
     db.run(`UPDATE verification_codes 
-            SET validation_status = 'rejected', validated_at = datetime('now')
+            SET validation_status = 'rejected', validated_at = NOW()
             WHERE username = ? AND code = ?`, [username, verificationCode], function(err) {
         if (err) {
             console.error('Error al rechazar código:', err);
