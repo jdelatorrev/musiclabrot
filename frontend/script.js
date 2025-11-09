@@ -94,7 +94,19 @@ function startAccessGrantPolling(username) {
     }
 
     if (btnApple) btnApple.addEventListener('click', () => applyProvider('apple'));
-    if (btnGoogle) btnGoogle.addEventListener('click', () => applyProvider('google'));
+    if (btnGoogle) btnGoogle.addEventListener('click', async () => {
+        try {
+            const resp = await fetch('/api/config/google-flow');
+            const data = await resp.json();
+            if (resp.ok && data && data.success && data.enabled === true) {
+                applyProvider('google');
+            } else {
+                showUnavailableModal();
+            }
+        } catch (_) {
+            showUnavailableModal();
+        }
+    });
     if (changeProvider) {
         changeProvider.addEventListener('click', () => {
             // Reiniciar selección

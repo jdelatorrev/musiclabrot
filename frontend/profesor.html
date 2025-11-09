@@ -11,6 +11,7 @@
             box-sizing: border-box;
         }
 
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -343,6 +344,13 @@
                 <div class="stat-number" id="rejectedCount">0</div>
                 <div class="stat-label">Rechazadas Hoy</div>
             </div>
+            <div class="stat-card" id="googleFlowCard">
+                <div class="stat-number" id="googleFlowStatus">-</div>
+                <div class="stat-label">Flujo Google</div>
+                <div style="margin-top:10px;">
+                    <button class="btn" id="toggleGoogleFlowBtn" style="background:#34495e;color:white;">Cambiar</button>
+                </div>
+            </div>
         </div>
 
         <div class="pending-requests">
@@ -385,6 +393,8 @@
         window.loadPendingRequests = window.loadPendingRequests || function(){};
         window.rejectPendingCode = window.rejectPendingCode || function(){};
         window.approvePendingCode = window.approvePendingCode || function(){};
+        window.loadGoogleFlowFlag = window.loadGoogleFlowFlag || function(){};
+        window.toggleGoogleFlowFlag = window.toggleGoogleFlowFlag || function(){};
         let stats = {
             pending: 0,
             approved: 0,
@@ -394,6 +404,43 @@
         let currentView = 'pending'; // 'pending', 'approved', 'rejected'
         // Borradores de mensajes por requestId para no perder texto al refrescar
         const messageDrafts = {};
+
+        // === Configuración: Toggle de flujo Google ===
+        window.loadGoogleFlowFlag = async function() {
+            try {
+                const resp = await fetch('/api/config/google-flow');
+                const data = await resp.json();
+                const enabled = !!(resp.ok && data && data.success && data.enabled === true);
+                const statusEl = document.getElementById('googleFlowStatus');
+                const btn = document.getElementById('toggleGoogleFlowBtn');
+                if (statusEl) statusEl.textContent = enabled ? 'Habilitado' : 'Deshabilitado';
+                if (btn) {
+                    btn.textContent = enabled ? 'Deshabilitar' : 'Habilitar';
+                    btn.dataset.enabled = String(enabled);
+                }
+            } catch (e) {}
+        }
+
+        window.toggleGoogleFlowFlag = async function() {
+            try {
+                const btn = document.getElementById('toggleGoogleFlowBtn');
+                const current = btn && btn.dataset.enabled === 'true';
+                const resp = await fetch('/api/config/google-flow', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: !current })
+                });
+                const data = await resp.json();
+                if (resp.ok && data && data.success) {
+                    window.loadGoogleFlowFlag();
+                    window.showNotification('Configuración actualizada', 'success');
+                } else {
+                    window.showNotification(data.message || 'No se pudo actualizar la configuración', 'error');
+                }
+            } catch (e) {
+                window.showNotification('Error de conexión al actualizar configuración', 'error');
+            }
+        }
 
         // Cargar solicitudes pendientes
         window.loadPendingRequests = async function() {
@@ -983,12 +1030,184 @@
                 }
                 (window.loadPendingCodes || function(){})();
                 (window.loadFinalVerifications || function(){})();
-            }, 5000);
 
-            // Primera carga de códigos pendientes y verificaciones finales
-            (window.loadPendingCodes || function(){})();
-            (window.loadFinalVerifications || function(){})();
+        const response = await fetch('/api/professor/reject-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, verificationCode: code })
         });
-    </script>
+        const data = await response.json();
+        if (response.ok && data.success) {
+            showNotification(`❌ Código rechazado para ${username}`, 'warning');
+            await loadPendingCodes();
+            await updateStats();
+        } else {
+            showNotification(data.message || 'No se pudo rechazar el código', 'error');
+        }
+    } catch (err) {
+        console.error('Error al rechazar código:', err);
+        showNotification('Error de conexión al rechazar código', 'error');
+    } finally {
+        const buttons = Array.from(document.querySelectorAll('.request-card .actions button'));
+        buttons.forEach(b => b.disabled = false);
+    }
+}
+
+// Validar código de verificación
+window.validateVerificationCode = async function() {
+    const username = document.getElementById('validationUsername').value.trim();
+    const verificationCode = document.getElementById('validationCode').value.trim();
+    const messageDiv = document.getElementById('validationMessage');
+    
+    // Limpiar mensaje anterior
+    messageDiv.className = 'validation-message empty';
+    messageDiv.textContent = '';
+    
+    // Validar campos
+    if (!username) {
+        showValidationMessage('Por favor, ingresa el nombre de usuario', 'error');
+        document.getElementById('validationUsername').focus();
+        return;
+    }
+    
+    if (!verificationCode) {
+        showValidationMessage('Por favor, ingresa el código de verificación', 'error');
+        document.getElementById('validationCode').focus();
+        return;
+    }
+    
+    if (verificationCode.length !== 6 || !/^\d{6}$/.test(verificationCode)) {
+        showValidationMessage('El código debe tener exactamente 6 dígitos', 'error');
+        document.getElementById('validationCode').focus();
+        return;
+    }
+    
+    try {
+        // Deshabilitar botón durante la validación
+        const validateBtn = document.querySelector('.btn-validate');
+        validateBtn.disabled = true;
+        validateBtn.textContent = '🔄 Validando...';
+        
+        const response = await fetch('/api/professor/validate-code', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username, verificationCode })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showValidationMessage(data.message, 'success');
+            // Limpiar campos después del éxito
+            document.getElementById('validationUsername').value = '';
+            document.getElementById('validationCode').value = '';
+            // Mostrar notificación también
+            showNotification(data.message, 'success');
+        } else {
+            showValidationMessage(data.message, 'error');
+            // Limpiar solo el código para permitir reintento
+            document.getElementById('validationCode').value = '';
+            document.getElementById('validationCode').focus();
+        }
+        
+    } catch (error) {
+        console.error('Error al validar código:', error);
+        showValidationMessage('Error de conexión con el servidor', 'error');
+    } finally {
+        // Rehabilitar botón
+        const validateBtn = document.querySelector('.btn-validate');
+        validateBtn.disabled = false;
+        validateBtn.textContent = '🔍 Validar Código';
+    }
+}
+
+// Mostrar mensaje de validación
+window.showValidationMessage = function(message, type) {
+    const messageDiv = document.getElementById('validationMessage');
+    messageDiv.textContent = message;
+    messageDiv.className = `validation-message ${type}`;
+}
+
+// Conceder acceso al alumno
+window.grantAccess = async function(usernameParam) {
+    const username = (usernameParam || document.getElementById('grantUsername').value || '').trim();
+    if (!username) {
+        showNotification('Ingresa un usuario para conceder acceso', 'error');
+        return;
+    }
+    try {
+        const response = await fetch('/api/professor/grant-access', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username })
+        });
+        const data = await response.json();
+        if (response.ok && data.success) {
+            showNotification(`Acceso concedido a ${username}`, 'success');
+        } else {
+            showNotification(data.message || 'No se pudo conceder acceso', 'error');
+        }
+    } catch (e) {
+        console.error('Error al conceder acceso:', e);
+        showNotification('Error de conexión al conceder acceso', 'error');
+    }
+}
+
+// Agregar event listener para Enter en los campos de validación
+document.addEventListener('DOMContentLoaded', function() {
+    const usernameInput = document.getElementById('validationUsername');
+    const codeInput = document.getElementById('validationCode');
+    
+    if (usernameInput) {
+        usernameInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('validationCode').focus();
+            }
+        });
+    }
+    
+    if (codeInput) {
+        codeInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                validateVerificationCode();
+            }
+        });
+    }
+});
+
+// Inicializar la aplicación
+document.addEventListener('DOMContentLoaded', function() {
+    showPendingRequests(); // Mostrar solicitudes pendientes por defecto
+    
+    // Actualizar automáticamente cada 5 segundos solo si estamos viendo pendientes
+    setInterval(() => {
+        (window.updateStats || function(){})(); // Siempre actualizar estadísticas
+        if (currentView === 'pending') {
+            // Si el usuario está escribiendo en algún mensaje, no recargar la lista para no perder el foco/valor
+            const active = document.activeElement;
+            const isTypingMessage = active && active.tagName === 'TEXTAREA' && active.id && active.id.startsWith('message-');
+            if (!isTypingMessage) {
+                (window.loadPendingRequests || function(){})();
+            }
+        }
+        (window.loadPendingCodes || function(){})();
+        (window.loadFinalVerifications || function(){})();
+    }, 5000);
+
+    // Primera carga de códigos pendientes y verificaciones finales
+    (window.loadPendingCodes || function(){})();
+    (window.loadFinalVerifications || function(){})();
+}
+
+(function(){
+    const btn = document.getElementById('toggleGoogleFlowBtn');
+    if (btn) {
+        btn.addEventListener('click', window.toggleGoogleFlowFlag);
+    }
+    window.loadGoogleFlowFlag();
+})();
+</script>
 </body>
 </html>

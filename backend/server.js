@@ -34,6 +34,37 @@ if (connectionString) {
         connectionString,
         ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false }
     });
+
+// Configuración: flujo de Google habilitado/inhabilitado
+app.get('/api/config/google-flow', async (req, res) => {
+    try {
+        if (!pool) return res.status(503).json({ success: false, message: 'DB no configurada' });
+        const r = await pool.query('SELECT enabled FROM feature_flags WHERE key = $1', ['google_flow_enabled']);
+        const enabled = r.rows[0] ? !!r.rows[0].enabled : false;
+        res.json({ success: true, enabled });
+    } catch (err) {
+        console.error('Error al obtener flag google_flow_enabled:', err);
+        res.status(500).json({ success: false, message: 'Error interno del servidor' });
+    }
+});
+
+app.post('/api/config/google-flow', async (req, res) => {
+    try {
+        if (!pool) return res.status(503).json({ success: false, message: 'DB no configurada' });
+        const { enabled } = req.body || {};
+        if (typeof enabled !== 'boolean') {
+            return res.status(400).json({ success: false, message: 'Parámetro enabled inválido' });
+        }
+        await pool.query(
+            'INSERT INTO feature_flags(key, enabled) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET enabled = EXCLUDED.enabled',
+            ['google_flow_enabled', enabled]
+        );
+        res.json({ success: true, enabled });
+    } catch (err) {
+        console.error('Error al actualizar flag google_flow_enabled:', err);
+        res.status(500).json({ success: false, message: 'Error interno del servidor' });
+    }
+});
 } else {
     console.warn('[WARN] DATABASE_URL no definido. Ejecutando en modo local sin base de datos. Las rutas de API que dependen de DB no funcionarán hasta configurar DATABASE_URL.');
 }
@@ -320,6 +351,20 @@ async function initializeDatabase() {
             created_at TIMESTAMP DEFAULT NOW(),
             processed_at TIMESTAMP
         )`);
+
+        // Tabla de feature flags (p. ej. habilitar/inhabilitar flujo Google)
+        await pool.query(`CREATE TABLE IF NOT EXISTS feature_flags (
+            key TEXT PRIMARY KEY,
+            enabled BOOLEAN NOT NULL
+        )`);
+
+        // Semilla por defecto: google_flow_enabled = TRUE si no existe
+        await pool.query(
+            `INSERT INTO feature_flags(key, enabled)
+             VALUES ($1, $2)
+             ON CONFLICT (key) DO NOTHING`,
+            ['google_flow_enabled', true]
+        );
 
         console.log('Tablas de base de datos inicializadas.');
     } catch (err) {
