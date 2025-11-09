@@ -1,0 +1,26 @@
+[
+  {
+    "id": "rec1",
+    "title": "rec1",
+    "artist": "",
+    "url": "/media/rec1.mp3"
+  },
+  {
+    "id": "rec2",
+    "title": "rec2",
+    "artist": "",
+    "url": "/media/rec2.mp3"
+  },
+  {
+    "id": "rec3",
+    "title": "rec3",
+    "artist": "",
+    "url": "/media/rec3.mp3"
+  },
+  {
+    "id": "rec4",
+    "title": "rec4",
+    "artist": "",
+    "url": "/media/rec4.mp3"
+  }
+]

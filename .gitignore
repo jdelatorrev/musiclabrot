@@ -19,3 +19,6 @@ yarn-error.log*
 # OS files
 .DS_Store
 Thumbs.db
+
+# Media assets (do not commit large audio files)
+/frontend/media/

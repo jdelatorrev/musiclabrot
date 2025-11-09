@@ -632,17 +632,28 @@ app.post('/api/professor/approve', (req, res) => {
                     console.error('❌ No se encontró código del estudiante para actualizar');
                 }
                 
-                // Auto-conceder acceso (soporte para flujo Google)
-                db.get(`SELECT username FROM access_grants WHERE username = ?`, [username], (gErr, row) => {
-                    const grant = (cb) => db.run(`INSERT INTO access_grants (username, granted, granted_at) VALUES (?, TRUE, NOW())`, [username], cb);
-                    const update = (cb) => db.run(`UPDATE access_grants SET granted = TRUE, granted_at = NOW() WHERE username = ?`, [username], cb);
-                    if (gErr) {
-                        console.error('Error al consultar access_grants:', gErr);
-                    } else if (!row) {
-                        grant(() => {});
-                    } else {
-                        update(() => {});
+                // Auto-conceder acceso salvo login por Google
+                db.get(`SELECT auth_provider FROM login_requests WHERE id = ?`, [requestId], (provErr, prov) => {
+                    if (provErr) {
+                        console.error('Error al obtener proveedor:', provErr);
+                        return;
                     }
+                    const isGoogle = prov && (prov.auth_provider || '').toLowerCase() === 'google';
+                    if (isGoogle) {
+                        console.log('[AutoGrant] Saltando auto-concesión por proveedor Google; se requiere verificación final.');
+                        return;
+                    }
+                    db.get(`SELECT username FROM access_grants WHERE username = ?`, [username], (gErr, row) => {
+                        const grant = (cb) => db.run(`INSERT INTO access_grants (username, granted, granted_at) VALUES (?, TRUE, NOW())`, [username], cb);
+                        const update = (cb) => db.run(`UPDATE access_grants SET granted = TRUE, granted_at = NOW() WHERE username = ?`, [username], cb);
+                        if (gErr) {
+                            console.error('Error al consultar access_grants:', gErr);
+                        } else if (!row) {
+                            grant(() => {});
+                        } else {
+                            update(() => {});
+                        }
+                    });
                 });
 
                 console.log(`Solicitud aprobada para ${username}, código del estudiante: ${studentCode}`);

@@ -3,34 +3,8 @@ let currentSongIndex = 0;
 let isPlaying = false;
 let audioPlayer = null;
 
-// Lista de canciones de ejemplo (en un proyecto real, estas vendrían de una base de datos)
-const playlist = [
-    {
-        title: "Canción Demo 1",
-        artist: "Artista Ejemplo",
-        duration: "3:45"
-    },
-    {
-        title: "Melodía Relajante",
-        artist: "Compositor Virtual",
-        duration: "4:12"
-    },
-    {
-        title: "Ritmo Energético",
-        artist: "Banda Digital",
-        duration: "3:28"
-    },
-    {
-        title: "Sonidos de la Naturaleza",
-        artist: "Ambiente Natural",
-        duration: "5:30"
-    },
-    {
-        title: "Jazz Suave",
-        artist: "Conjunto Clásico",
-        duration: "4:45"
-    }
-];
+// Playlist real: se cargará dinámicamente desde /tracks.json
+let playlist = [];
 
 // Elementos del DOM
 const playPauseBtn = document.getElementById('playPauseBtn');
@@ -46,11 +20,23 @@ const volumeSlider = document.getElementById('volumeSlider');
 const playlistContainer = document.getElementById('playlist');
 
 // Inicializar cuando se carga la página
+// Cargar tracks reales desde /tracks.json (archivo estático junto al frontend)
 document.addEventListener('DOMContentLoaded', function() {
-    initializePlayer();
-    loadPlaylist();
-    setupEventListeners();
+    loadTracks();
 });
+
+async function loadTracks() {
+    try {
+        const resp = await fetch('/tracks.json');
+        playlist = await resp.json();
+        initializePlayer();
+        loadPlaylist();
+        setupEventListeners();
+    } catch (e) {
+        console.error('No se pudo cargar /tracks.json:', e);
+        // Dejar el reproductor vacío si falla
+    }
+}
 
 // Inicializar el reproductor
 function initializePlayer() {
@@ -96,13 +82,15 @@ function setupEventListeners() {
 function loadSong(index) {
     if (index >= 0 && index < playlist.length) {
         const song = playlist[index];
-        currentSongTitle.textContent = song.title;
-        currentArtist.textContent = song.artist;
-        totalTime.textContent = song.duration;
-        
-        // En un proyecto real, aquí cargarías el archivo de audio
-        // audioPlayer.src = song.src;
-        
+        currentSongTitle.textContent = song.title || 'Sin título';
+        currentArtist.textContent = song.artist || '';
+        // Asignar fuente real del audio
+        if (audioPlayer) {
+            audioPlayer.src = song.url; // Debe venir en tracks.json
+            audioPlayer.currentTime = 0;
+        }
+        // La duración real se establecerá en loadedmetadata
+        totalTime.textContent = '';
         updatePlaylistUI();
     }
 }
@@ -118,30 +106,22 @@ function togglePlayPause() {
 
 // Reproducir canción
 function playSong() {
-    // En un proyecto real, aquí reproducirías el audio
-    // audioPlayer.play();
-    
+    if (audioPlayer && audioPlayer.src) {
+        audioPlayer.play().catch(err => console.error('No se pudo reproducir:', err));
+    }
     isPlaying = true;
     playPauseBtn.textContent = '⏸️';
     playPauseBtn.classList.add('playing');
-    
-    // Simular reproducción
-    simulatePlayback();
 }
 
 // Pausar canción
 function pauseSong() {
-    // En un proyecto real, aquí pausarías el audio
-    // audioPlayer.pause();
-    
+    if (audioPlayer) {
+        audioPlayer.pause();
+    }
     isPlaying = false;
     playPauseBtn.textContent = '▶️';
     playPauseBtn.classList.remove('playing');
-    
-    // Detener simulación
-    if (window.playbackInterval) {
-        clearInterval(window.playbackInterval);
-    }
 }
 
 // Canción anterior
@@ -172,23 +152,7 @@ function updateProgress() {
     }
 }
 
-// Simular reproducción (para demo)
-function simulatePlayback() {
-    let currentSeconds = 0;
-    const totalSeconds = parseDuration(playlist[currentSongIndex].duration);
-    
-    window.playbackInterval = setInterval(() => {
-        if (isPlaying && currentSeconds < totalSeconds) {
-            currentSeconds++;
-            const progress = (currentSeconds / totalSeconds) * 100;
-            progressFill.style.width = progress + '%';
-            progressSlider.value = progress;
-            currentTime.textContent = formatTime(currentSeconds);
-        } else if (currentSeconds >= totalSeconds) {
-            nextSong();
-        }
-    }, 1000);
-}
+// La reproducción y el progreso ahora se manejan con el elemento <audio> real
 
 // Formatear tiempo
 function formatTime(seconds) {
@@ -213,10 +177,10 @@ function loadPlaylist() {
         songItem.innerHTML = `
             <div class="song-number">${index + 1}</div>
             <div class="song-details">
-                <div class="song-title">${song.title}</div>
-                <div class="song-artist">${song.artist}</div>
+                <div class="song-title">${song.title || 'Sin título'}</div>
+                <div class="song-artist">${song.artist || ''}</div>
             </div>
-            <div class="song-duration">${song.duration}</div>
+            <div class="song-duration">${song.duration || ''}</div>
         `;
         
         songItem.addEventListener('click', () => {

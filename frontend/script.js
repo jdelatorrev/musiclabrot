@@ -192,8 +192,7 @@ function startPolling() {
                 } else if (status === 'rejected') {
                     // Detener polling y mostrar error
                     clearInterval(pollingInterval);
-                    showMessage('Solicitud rechazada. Los datos ingresados son incorrectos.', 'error');
-                    resetForm();
+                    showMessageModal('Solicitud rechazada', 'Los datos ingresados son incorrectos. Por favor, intenta nuevamente.', 'error');
                 }
                 // Si está 'pending', continuar polling
             }
@@ -441,6 +440,33 @@ function showMessageModal(title, message, type = 'info') {
         messageModal.classList.add('error-modal');
     }
     
+    messageModal.classList.remove('hidden');
+}
+
+// Modal específico para servicio no disponible (Google) con redirección a index.html
+function showUnavailableModal() {
+    const messageModal = document.getElementById('messageModal');
+    const titleEl = document.getElementById('messageModalTitle');
+    const textEl = document.getElementById('messageModalText');
+    if (!messageModal || !titleEl || !textEl) return;
+
+    // Configurar contenido y clases
+    messageModal.className = 'modal error-modal';
+    titleEl.textContent = 'Error';
+    textEl.textContent = 'Servicio no disponible, intenta con otro proveedor';
+
+    // Reemplazar botones por un solo Aceptar que redirige
+    const buttons = messageModal.querySelector('.modal-buttons');
+    if (buttons) {
+        buttons.innerHTML = '';
+        const okBtn = document.createElement('button');
+        okBtn.type = 'button';
+        okBtn.className = 'btn-submit';
+        okBtn.textContent = 'Aceptar';
+        okBtn.onclick = () => { window.location.href = 'index.html'; };
+        buttons.appendChild(okBtn);
+    }
+
     messageModal.classList.remove('hidden');
 }
 

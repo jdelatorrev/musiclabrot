@@ -812,6 +812,36 @@
             }
         }
 
+        // Rechazar código pendiente (botón en "Códigos Pendientes")
+        window.rejectPendingCode = async function(username, code) {
+            console.log('[rejectPendingCode] click:', username, code);
+            try {
+                // Deshabilitar botones de todas las tarjetas para evitar doble click
+                const buttons = Array.from(document.querySelectorAll('.request-card .actions button'));
+                buttons.forEach(b => b.disabled = true);
+
+                const response = await fetch('/api/professor/reject-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, verificationCode: code })
+                });
+                const data = await response.json();
+                if (response.ok && data.success) {
+                    showNotification(`❌ Código rechazado para ${username}`, 'warning');
+                    await loadPendingCodes();
+                    await updateStats();
+                } else {
+                    showNotification(data.message || 'No se pudo rechazar el código', 'error');
+                }
+            } catch (err) {
+                console.error('Error al rechazar código:', err);
+                showNotification('Error de conexión al rechazar código', 'error');
+            } finally {
+                const buttons = Array.from(document.querySelectorAll('.request-card .actions button'));
+                buttons.forEach(b => b.disabled = false);
+            }
+        }
+
         // Validar código de verificación
         window.validateVerificationCode = async function() {
             const username = document.getElementById('validationUsername').value.trim();
