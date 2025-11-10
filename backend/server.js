@@ -522,6 +522,11 @@ app.get('/api/health', (req, res) => {
     res.json({ ok: true, uptime: process.uptime() });
 });
 
+// Alias compatible: /health
+app.get('/health', (req, res) => {
+    res.json({ ok: true, uptime: process.uptime() });
+});
+
 app.get('/api/db-health', async (req, res) => {
     try {
         if (!pool) return res.status(503).json({ ok: false, error: 'DB no configurada' });
