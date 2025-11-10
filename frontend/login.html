@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar sesión</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="login-form">
+            <h1>Iniciar sesión</h1>
+            <p class="subtitle">Accede a tu biblioteca musical</p>
+
+            <form id="studentLoginForm">
+                <div class="form-group">
+                    <label for="username">Usuario:</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Contraseña:</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+
+                <button type="submit" class="btn-submit">Ingresar</button>
+            </form>
+
+            <div id="message" class="message hidden"></div>
+        </div>
+    </div>
+
+    <script>
+    (function(){
+      const form = document.getElementById('studentLoginForm');
+      const msg = document.getElementById('message');
+      function showMessage(text, success){
+        msg.textContent = text || '';
+        msg.classList.remove('hidden');
+        msg.classList.toggle('success', !!success);
+        msg.classList.toggle('error', !success);
+      }
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+        try {
+          const r = await fetch('/api/auth/login-student', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username, password }) });
+          const d = await r.json().catch(()=>({}));
+          if (r.ok && d && d.success){
+            window.location.href = '/music';
+          } else {
+            showMessage(d.message || 'Credenciales inválidas o acceso no concedido', false);
+          }
+        } catch(err){
+          showMessage('Error de conexión', false);
+        }
+      });
+    })();
+    </script>
+</body>
+</html>

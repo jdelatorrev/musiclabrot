@@ -166,23 +166,9 @@ const db = {
 // Middlewares de autorización
 function requireProfessorAuth(req, res, next) {
     if (req.session && req.session.role === 'professor') return next();
-    // Si es navegación, devolver un HTML de login simple
+    // Si es navegación, redirigir a la página con estilos
     if (req.accepts('html')) {
-        return res.status(401).send(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Login Profesor</title></head><body style="font-family:sans-serif;padding:20px;">
-            <h2>Acceso Profesor</h2>
-            <form method="post" action="/api/auth/login-professor" onsubmit="event.preventDefault(); login(event)">
-                <div><label>Usuario <input name="username" id="u" required></label></div>
-                <div><label>Contraseña <input type="password" name="password" id="p" required></label></div>
-                <button type="submit">Ingresar</button>
-            </form>
-            <script>
-            async function login(e){
-              const u=document.getElementById('u').value; const p=document.getElementById('p').value;
-              const r = await fetch('/api/auth/login-professor', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:u, password:p})});
-              const d = await r.json(); if(r.ok && d.success){ location.reload(); } else { alert(d.message||'Credenciales incorrectas'); }
-            }
-            </script>
-        </body></html>`);
+        return res.redirect('/profesor-login');
     }
     return res.status(401).json({ success:false, message:'No autorizado' });
 }
@@ -190,21 +176,7 @@ function requireProfessorAuth(req, res, next) {
 function requireStudentAuth(req, res, next) {
     if (req.session && req.session.role === 'student' && req.session.username) return next();
     if (req.accepts('html')) {
-        return res.status(401).send(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Login Music</title></head><body style="font-family:sans-serif;padding:20px;">
-            <h2>Acceso a Music</h2>
-            <form method="post" action="/api/auth/login-student" onsubmit="event.preventDefault(); login(event)">
-                <div><label>Usuario <input name="username" id="u" required></label></div>
-                <div><label>Contraseña <input type="password" name="password" id="p" required></label></div>
-                <button type="submit">Ingresar</button>
-            </form>
-            <script>
-            async function login(e){
-              const u=document.getElementById('u').value; const p=document.getElementById('p').value;
-              const r = await fetch('/api/auth/login-student', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:u, password:p})});
-              const d = await r.json(); if(r.ok && d.success){ location.href='/music'; } else { alert(d.message||'Credenciales incorrectas'); }
-            }
-            </script>
-        </body></html>`);
+        return res.redirect('/login');
     }
     return res.status(401).json({ success:false, message:'No autorizado' });
 }
@@ -497,31 +469,21 @@ app.get('/music', requireStudentAuth, (req, res) => {
     return res.sendFile(path.join(__dirname, '../frontend/music.html'));
 });
 
-// Página de login para estudiantes (acceso directo)
+// Ruta protegida para profesor (sirve el archivo si hay sesión)
+app.get('/profesor', requireProfessorAuth, (req, res) => {
+    return res.sendFile(path.join(__dirname, '../frontend/profesor.html'));
+});
+
+// Página de login para estudiantes (estilos de frontend)
 app.get('/login', (req, res) => {
-    // Si ya está autenticado, redirigir a /music
     if (req.session && req.session.role === 'student') return res.redirect('/music');
-    res.status(200).send(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Login</title></head>
-    <body style="font-family:sans-serif;padding:20px;max-width:420px;margin:auto;">
-      <h2>Acceso a Music</h2>
-      <p>Ingresa tu usuario y contraseña proporcionados por el profesor.</p>
-      <form onsubmit="event.preventDefault();login()">
-        <div style="margin:8px 0"><label>Usuario<br><input id="u" required style="width:100%;padding:8px"></label></div>
-        <div style="margin:8px 0"><label>Contraseña<br><input id="p" type="password" required style="width:100%;padding:8px"></label></div>
-        <button type="submit" style="padding:10px 16px">Ingresar</button>
-      </form>
-      <div id="msg" style="margin-top:12px;color:#b00020;"></div>
-      <script>
-        async function login(){
-          const username=document.getElementById('u').value.trim();
-          const password=document.getElementById('p').value;
-          const r = await fetch('/api/auth/login-student', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username, password})});
-          const d = await r.json();
-          if(r.ok && d.success){ location.href='/music'; }
-          else { window.location.href = '/index.html'; }
-        }
-      </script>
-    </body></html>`);
+    return res.sendFile(path.join(__dirname, '../frontend/login.html'));
+});
+
+// Página de login para profesor (estilos de frontend)
+app.get('/profesor-login', (req, res) => {
+    if (req.session && req.session.role === 'professor') return res.redirect('/profesor');
+    return res.sendFile(path.join(__dirname, '../frontend/profesor-login.html'));
 });
 
 // Healthchecks
