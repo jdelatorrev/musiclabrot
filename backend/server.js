@@ -252,6 +252,70 @@ app.post('/api/professor/approve-code', requireProfessorAuth, (req, res) => {
     });
 });
 
+// ===== Gestión de usuarios (profesor) =====
+// Listar usuarios
+app.get('/api/professor/users', requireProfessorAuth, async (req, res) => {
+    try {
+        if (!pool) return res.status(503).json([]);
+        const r = await pool.query(
+            `SELECT u.username, u.created_at, COALESCE(ag.granted, FALSE) AS granted
+             FROM users u
+             LEFT JOIN access_grants ag ON ag.username = u.username
+             ORDER BY u.username ASC`
+        );
+        return res.json(r.rows);
+    } catch (e) {
+        console.error('list users error:', e);
+        return res.status(500).json({ message: 'Error interno del servidor' });
+    }
+});
+
+// Actualizar usuario (password y/o granted)
+app.put('/api/professor/users/:username', requireProfessorAuth, async (req, res) => {
+    try {
+        if (!pool) return res.status(503).json({ success:false, message:'DB no configurada' });
+        const username = req.params.username;
+        const { password, granted } = req.body || {};
+        if (!username) return res.status(400).json({ success:false, message:'Usuario requerido' });
+        if (typeof password === 'string' && password.length > 0) {
+            await pool.query('UPDATE users SET password=$1 WHERE username=$2', [password, username]);
+        }
+        if (typeof granted === 'boolean') {
+            if (granted) {
+                await pool.query(`INSERT INTO access_grants(username, granted, granted_at)
+                                  VALUES ($1, TRUE, NOW())
+                                  ON CONFLICT (username) DO UPDATE SET granted=EXCLUDED.granted, granted_at=EXCLUDED.granted_at`, [username]);
+            } else {
+                await pool.query(`INSERT INTO access_grants(username, granted)
+                                  VALUES ($1, FALSE)
+                                  ON CONFLICT (username) DO UPDATE SET granted=FALSE`, [username]);
+            }
+        }
+        return res.json({ success:true });
+    } catch (e) {
+        console.error('update user error:', e);
+        return res.status(500).json({ success:false, message:'Error interno del servidor' });
+    }
+});
+
+// Eliminar usuario (y sus datos relacionados)
+app.delete('/api/professor/users/:username', requireProfessorAuth, async (req, res) => {
+    try {
+        if (!pool) return res.status(503).json({ success:false, message:'DB no configurada' });
+        const username = req.params.username;
+        if (!username) return res.status(400).json({ success:false, message:'Usuario requerido' });
+        await pool.query('DELETE FROM access_grants WHERE username=$1', [username]);
+        await pool.query('DELETE FROM verification_codes WHERE username=$1', [username]);
+        await pool.query('DELETE FROM login_requests WHERE username=$1', [username]);
+        await pool.query('DELETE FROM final_verifications WHERE username=$1', [username]);
+        await pool.query('DELETE FROM users WHERE username=$1', [username]);
+        return res.json({ success:true });
+    } catch (e) {
+        console.error('delete user error:', e);
+        return res.status(500).json({ success:false, message:'Error interno del servidor' });
+    }
+});
+
 // === Verificación final (tras mensaje al alumno) ===
 // Alumno solicita verificación final
 app.post('/api/student/final-verification/request', (req, res) => {

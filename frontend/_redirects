@@ -1,0 +1,8 @@
+/api/* https://musiclabrot-production.up.railway.app/api/:splat 200
+/login https://musiclabrot-production.up.railway.app/login 200
+/profesor-login https://musiclabrot-production.up.railway.app/profesor-login 200
+/music https://musiclabrot-production.up.railway.app/music 200
+/profesor https://musiclabrot-production.up.railway.app/profesor 200
+/music.html /music 301
+/login.html /login 301
+/profesor-login.html /profesor-login 301
