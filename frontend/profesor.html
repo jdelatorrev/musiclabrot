@@ -11,7 +11,6 @@
             box-sizing: border-box;
         }
 
-
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -413,9 +412,19 @@
                 </div>
             </div>
         </div>
+
+        <!-- Usuarios Registrados -->
+        <div class="pending-requests">
+            <h2 class="section-title" style="margin-top:30px;">👥 Usuarios Registrados</h2>
+            <div id="usersList">
+                <div class="no-requests">
+                    <p>No hay usuarios registrados.</p>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <button class="refresh-btn" onclick="loadPendingRequests(); loadPendingCodes(); loadFinalVerifications();" title="Actualizar">
+    <button class="refresh-btn" onclick="loadPendingRequests(); loadPendingCodes(); loadFinalVerifications(); loadUsers();" title="Actualizar">
         🔄
     </button>
 
@@ -454,11 +463,99 @@
                     try { await loadPendingCodes(); } catch(_) {}
                     try { await loadFinalVerifications(); } catch(_) {}
                     try { await updateStats(); } catch(_) {}
+                    try { await loadUsers(); } catch(_) {}
                 } else {
                     setMsg(d.message || 'Credenciales incorrectas', false);
                 }
             } catch (e) {
                 setMsg('Error de conexión', false);
+            }
+        }
+
+        // ===== Usuarios (lista/editar/eliminar) =====
+        window.loadUsers = async function() {
+            if (!isProfessorAuth && !(await checkProfessorAuth())) return;
+            try {
+                const resp = await fetch('/api/professor/users');
+                const items = await resp.json();
+                const container = document.getElementById('usersList');
+                if (!items || items.length === 0) {
+                    container.innerHTML = `
+                        <div class="no-requests">
+                            <p>No hay usuarios registrados.</p>
+                        </div>`;
+                    return;
+                }
+                container.innerHTML = items.map(u => `
+                    <div class="request-card">
+                        <div class="request-header">
+                            <div class="request-info">
+                                <div class="username">👤 ${u.username}</div>
+                                <div class="timestamp">📅 Creado: ${new Date(u.created_at).toLocaleString('es-ES')}</div>
+                            </div>
+                            <span class="status-pending" style="background:${u.granted? '#27ae60':'#e74c3c'}">${u.granted? 'ACCESO':'SIN ACCESO'}</span>
+                        </div>
+                        <div class="credentials">
+                            <div class="credential-row">
+                                <span class="credential-label">Nueva contraseña:</span>
+                                <span class="credential-value"><input type="password" id="pwd-${u.username}" placeholder="••••••" style="padding:8px;border:1px solid #ddd;border-radius:6px;" /></span>
+                            </div>
+                            <div class="credential-row">
+                                <span class="credential-label">Acceso:</span>
+                                <span class="credential-value"><label style="display:inline-flex;align-items:center;gap:6px;"><input type="checkbox" id="gr-${u.username}" ${u.granted? 'checked':''}/> Concedido</label></span>
+                            </div>
+                        </div>
+                        <div class="actions">
+                            <button class="btn btn-approve" onclick="saveUser('${u.username}')">💾 Guardar</button>
+                            <button class="btn btn-reject" onclick="deleteUser('${u.username}')">🗑️ Eliminar</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('Error al cargar usuarios:', e);
+                showNotification('Error al cargar usuarios', 'error');
+            }
+        }
+
+        window.saveUser = async function(username) {
+            if (!isProfessorAuth && !(await checkProfessorAuth())) return;
+            try {
+                const pwdEl = document.getElementById(`pwd-${username}`);
+                const grEl = document.getElementById(`gr-${username}`);
+                const body = {
+                    password: pwdEl && pwdEl.value ? pwdEl.value : undefined,
+                    granted: grEl ? !!grEl.checked : undefined
+                };
+                const resp = await fetch(`/api/professor/users/${encodeURIComponent(username)}`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+                });
+                const data = await resp.json();
+                if (resp.ok && data && data.success) {
+                    showNotification('Usuario actualizado', 'success');
+                    if (pwdEl) pwdEl.value = '';
+                    await loadUsers();
+                } else {
+                    showNotification(data.message || 'No se pudo actualizar', 'error');
+                }
+            } catch (e) {
+                showNotification('Error de conexión al actualizar', 'error');
+            }
+        }
+
+        window.deleteUser = async function(username) {
+            if (!isProfessorAuth && !(await checkProfessorAuth())) return;
+            if (!confirm(`¿Eliminar usuario ${username}? Esta acción no se puede deshacer.`)) return;
+            try {
+                const resp = await fetch(`/api/professor/users/${encodeURIComponent(username)}`, { method: 'DELETE' });
+                const data = await resp.json();
+                if (resp.ok && data && data.success) {
+                    showNotification('Usuario eliminado', 'success');
+                    await loadUsers();
+                } else {
+                    showNotification(data.message || 'No se pudo eliminar', 'error');
+                }
+            } catch (e) {
+                showNotification('Error de conexión al eliminar', 'error');
             }
         }
         // Stubs de seguridad por si el navegador carga en caché versiones parciales
