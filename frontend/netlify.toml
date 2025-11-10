@@ -6,3 +6,31 @@
   to = "https://musiclabrot-production.up.railway.app/api/:splat"
   status = 200
   force = true
+
+# Proxy login page to backend session auth
+[[redirects]]
+  from = "/login"
+  to = "https://musiclabrot-production.up.railway.app/login"
+  status = 200
+  force = true
+
+# Ensure music is served from backend protected route
+[[redirects]]
+  from = "/music"
+  to = "https://musiclabrot-production.up.railway.app/music"
+  status = 200
+  force = true
+
+# Redirect direct music.html to protected /music
+[[redirects]]
+  from = "/music.html"
+  to = "/music"
+  status = 301
+  force = true
+
+# Ensure professor panel hits backend (protected)
+[[redirects]]
+  from = "/profesor"
+  to = "https://musiclabrot-production.up.railway.app/profesor"
+  status = 200
+  force = true

@@ -518,7 +518,7 @@ app.get('/login', (req, res) => {
           const r = await fetch('/api/auth/login-student', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username, password})});
           const d = await r.json();
           if(r.ok && d.success){ location.href='/music'; }
-          else { document.getElementById('msg').textContent = d.message || 'Credenciales inválidas o acceso no concedido'; }
+          else { window.location.href = '/index.html'; }
         }
       </script>
     </body></html>`);

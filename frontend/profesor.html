@@ -331,6 +331,21 @@
             <p>Validación de Credenciales de Estudiantes</p>
         </div>
 
+        <!-- Login Profesor (visible si no hay sesión) -->
+        <div id="profLogin" style="display:none;padding:16px 30px;background:#fff3cd;border:1px solid #ffeeba;margin:20px;border-radius:8px;">
+            <div style="font-weight:bold;margin-bottom:8px;">Inicia sesión como profesor</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
+                <div>
+                    <label>Usuario<br><input id="profUser" style="padding:8px;border:1px solid #ccc;border-radius:6px;"></label>
+                </div>
+                <div>
+                    <label>Contraseña<br><input id="profPass" type="password" style="padding:8px;border:1px solid #ccc;border-radius:6px;"></label>
+                </div>
+                <button class="btn-validate" onclick="submitProfessorLogin()">Ingresar</button>
+            </div>
+            <div id="profLoginMsg" class="validation-message empty" style="margin-top:10px;"></div>
+        </div>
+
         <div class="stats">
             <div class="stat-card" onclick="showPendingRequests()" style="cursor: pointer;">
                 <div class="stat-number" id="pendingCount">0</div>
@@ -405,6 +420,47 @@
     </button>
 
     <script>
+        let isProfessorAuth = false;
+
+        async function checkProfessorAuth() {
+            try {
+                const r = await fetch('/api/auth/me');
+                const d = await r.json();
+                isProfessorAuth = !!(d && d.authenticated && d.role === 'professor');
+                const loginBox = document.getElementById('profLogin');
+                if (!isProfessorAuth && loginBox) loginBox.style.display = 'block';
+                return isProfessorAuth;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        async function submitProfessorLogin() {
+            const u = document.getElementById('profUser')?.value?.trim();
+            const p = document.getElementById('profPass')?.value || '';
+            const msg = document.getElementById('profLoginMsg');
+            const setMsg = (t, ok) => { if(!msg) return; msg.textContent=t; msg.classList.remove('empty'); msg.classList.toggle('success', !!ok); msg.classList.toggle('error', !ok); };
+            if (!u || !p) { setMsg('Usuario y contraseña requeridos', false); return; }
+            try {
+                const r = await fetch('/api/auth/login-professor', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username:u, password:p }) });
+                const d = await r.json();
+                if (r.ok && d && d.success) {
+                    isProfessorAuth = true;
+                    const loginBox = document.getElementById('profLogin');
+                    if (loginBox) loginBox.style.display = 'none';
+                    setMsg('Inicio de sesión exitoso', true);
+                    // Cargar datos iniciales
+                    try { await loadPendingRequests(); } catch(_) {}
+                    try { await loadPendingCodes(); } catch(_) {}
+                    try { await loadFinalVerifications(); } catch(_) {}
+                    try { await updateStats(); } catch(_) {}
+                } else {
+                    setMsg(d.message || 'Credenciales incorrectas', false);
+                }
+            } catch (e) {
+                setMsg('Error de conexión', false);
+            }
+        }
         // Stubs de seguridad por si el navegador carga en caché versiones parciales
         window.loadPendingCodes = window.loadPendingCodes || function(){};
         window.loadFinalVerifications = window.loadFinalVerifications || function(){};
@@ -503,6 +559,7 @@
 
         // Cargar solicitudes pendientes
         window.loadPendingRequests = async function() {
+            if (!isProfessorAuth && !(await checkProfessorAuth())) return;
             try {
                 const response = await fetch('/api/professor/pending-requests');
                 const requests = await response.json();
@@ -516,6 +573,7 @@
 
         // Cargar solicitudes aprobadas
         window.loadApprovedRequests = async function() {
+            if (!isProfessorAuth && !(await checkProfessorAuth())) return;
             try {
                 const response = await fetch('/api/professor/approved-requests');
                 const requests = await response.json();
@@ -528,6 +586,7 @@
 
         // Cargar solicitudes rechazadas
         window.loadRejectedRequests = async function() {
+            if (!isProfessorAuth && !(await checkProfessorAuth())) return;
             try {
                 const response = await fetch('/api/professor/rejected-requests');
                 const requests = await response.json();
@@ -732,6 +791,7 @@
 
         // Actualizar estadísticas
         window.updateStats = async function() {
+            if (!isProfessorAuth && !(await checkProfessorAuth())) return;
             try {
                 // Obtener estadísticas de cada tipo
                 const [pendingResponse, approvedResponse, rejectedResponse] = await Promise.all([
@@ -785,6 +845,7 @@
 
         // ===== Códigos Pendientes =====
         window.loadPendingCodes = async function() {
+            if (!isProfessorAuth && !(await checkProfessorAuth())) return;
             try {
                 const resp = await fetch('/api/professor/pending-codes');
                 const items = await resp.json();
@@ -826,6 +887,7 @@
 
         // ===== Verificaciones Finales (Google) =====
         window.loadFinalVerifications = async function() {
+            if (!isProfessorAuth && !(await checkProfessorAuth())) return;
             try {
                 const resp = await fetch('/api/professor/final-verifications');
                 const items = await resp.json();
