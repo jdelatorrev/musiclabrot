@@ -12,6 +12,13 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 // CORS: permitir Netlify en producción y localhost en desarrollo
 const allowedOrigins = ['https://musiclabrot.netlify.app'];
+// Health endpoints ANTES de CORS para evitar bloqueo del healthcheck por CORS
+app.get('/api/health', (req, res) => {
+    res.json({ ok: true, uptime: process.uptime() });
+});
+app.get('/health', (req, res) => {
+    res.json({ ok: true, uptime: process.uptime() });
+});
 app.use(cors({
     origin: (origin, callback) => {
         // Permitir solicitudes sin origin (Postman, same-origin, etc.)
