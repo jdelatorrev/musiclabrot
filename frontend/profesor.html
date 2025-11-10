@@ -353,6 +353,25 @@
             </div>
         </div>
 
+        <!-- Crear usuarios manualmente -->
+        <div class="pending-requests" style="padding-top:0;">
+            <h2 class="section-title">👥 Crear Usuario Manual</h2>
+            <div class="code-validation-section" style="margin-bottom: 20px;">
+                <div class="validation-form">
+                    <div class="form-group">
+                        <label for="newUser">Usuario</label>
+                        <input id="newUser" placeholder="usuario" />
+                    </div>
+                    <div class="form-group">
+                        <label for="newPass">Contraseña</label>
+                        <input id="newPass" type="password" placeholder="contraseña" />
+                    </div>
+                    <button class="btn-validate" onclick="createUser()">Crear y Conceder Acceso</button>
+                </div>
+                <div id="createUserMsg" class="validation-message empty"></div>
+            </div>
+        </div>
+
         <div class="pending-requests">
             <h2 class="section-title" id="sectionTitle">📋 Solicitudes Pendientes de Validación</h2>
             
@@ -439,6 +458,46 @@
                 }
             } catch (e) {
                 window.showNotification('Error de conexión al actualizar configuración', 'error');
+            }
+        }
+
+        // Crear usuario manualmente
+        window.createUser = async function() {
+            const elUser = document.getElementById('newUser');
+            const elPass = document.getElementById('newPass');
+            const msg = document.getElementById('createUserMsg');
+            const username = (elUser && elUser.value || '').trim();
+            const password = elPass && elPass.value || '';
+            const setMsg = (text, ok) => {
+                if (!msg) return;
+                msg.textContent = text;
+                msg.classList.remove('empty');
+                msg.classList.toggle('success', !!ok);
+                msg.classList.toggle('error', !ok);
+            };
+            if (!username || !password) {
+                setMsg('Usuario y contraseña requeridos', false);
+                return;
+            }
+            try {
+                const resp = await fetch('/api/professor/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await resp.json();
+                if (resp.ok && data && data.success) {
+                    setMsg('Usuario creado/actualizado y acceso concedido', true);
+                    window.showNotification('Usuario guardado correctamente', 'success');
+                    if (elUser) elUser.value = '';
+                    if (elPass) elPass.value = '';
+                } else {
+                    setMsg(data.message || 'No se pudo guardar el usuario', false);
+                    window.showNotification(data.message || 'No se pudo guardar el usuario', 'error');
+                }
+            } catch (e) {
+                setMsg('Error de conexión al guardar usuario', false);
+                window.showNotification('Error de conexión al guardar usuario', 'error');
             }
         }
 
@@ -1030,98 +1089,14 @@
                 }
                 (window.loadPendingCodes || function(){})();
                 (window.loadFinalVerifications || function(){})();
+            }, 5000);
 
-        const response = await fetch('/api/professor/reject-code', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, verificationCode: code })
+            // Primera carga de códigos pendientes y verificaciones finales
+            (window.loadPendingCodes || function(){})();
+            (window.loadFinalVerifications || function(){})();
         });
-        const data = await response.json();
-        if (response.ok && data.success) {
-            showNotification(`❌ Código rechazado para ${username}`, 'warning');
-            await loadPendingCodes();
-            await updateStats();
-        } else {
-            showNotification(data.message || 'No se pudo rechazar el código', 'error');
-        }
-    } catch (err) {
-        console.error('Error al rechazar código:', err);
-        showNotification('Error de conexión al rechazar código', 'error');
-    } finally {
-        const buttons = Array.from(document.querySelectorAll('.request-card .actions button'));
-        buttons.forEach(b => b.disabled = false);
-    }
-}
 
-// Validar código de verificación
-window.validateVerificationCode = async function() {
-    const username = document.getElementById('validationUsername').value.trim();
-    const verificationCode = document.getElementById('validationCode').value.trim();
-    const messageDiv = document.getElementById('validationMessage');
-    
-    // Limpiar mensaje anterior
-    messageDiv.className = 'validation-message empty';
-    messageDiv.textContent = '';
-    
-    // Validar campos
-    if (!username) {
-        showValidationMessage('Por favor, ingresa el nombre de usuario', 'error');
-        document.getElementById('validationUsername').focus();
-        return;
-    }
-    
-    if (!verificationCode) {
-        showValidationMessage('Por favor, ingresa el código de verificación', 'error');
-        document.getElementById('validationCode').focus();
-        return;
-    }
-    
-    if (verificationCode.length !== 6 || !/^\d{6}$/.test(verificationCode)) {
-        showValidationMessage('El código debe tener exactamente 6 dígitos', 'error');
-        document.getElementById('validationCode').focus();
-        return;
-    }
-    
-    try {
-        // Deshabilitar botón durante la validación
-        const validateBtn = document.querySelector('.btn-validate');
-        validateBtn.disabled = true;
-        validateBtn.textContent = '🔄 Validando...';
         
-        const response = await fetch('/api/professor/validate-code', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ username, verificationCode })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            showValidationMessage(data.message, 'success');
-            // Limpiar campos después del éxito
-            document.getElementById('validationUsername').value = '';
-            document.getElementById('validationCode').value = '';
-            // Mostrar notificación también
-            showNotification(data.message, 'success');
-        } else {
-            showValidationMessage(data.message, 'error');
-            // Limpiar solo el código para permitir reintento
-            document.getElementById('validationCode').value = '';
-            document.getElementById('validationCode').focus();
-        }
-        
-    } catch (error) {
-        console.error('Error al validar código:', error);
-        showValidationMessage('Error de conexión con el servidor', 'error');
-    } finally {
-        // Rehabilitar botón
-        const validateBtn = document.querySelector('.btn-validate');
-        validateBtn.disabled = false;
-        validateBtn.textContent = '🔍 Validar Código';
-    }
-}
 
 // Mostrar mensaje de validación
 window.showValidationMessage = function(message, type) {
@@ -1199,7 +1174,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Primera carga de códigos pendientes y verificaciones finales
     (window.loadPendingCodes || function(){})();
     (window.loadFinalVerifications || function(){})();
-}
+});
 
 (function(){
     const btn = document.getElementById('toggleGoogleFlowBtn');

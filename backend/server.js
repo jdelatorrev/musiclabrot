@@ -4,6 +4,7 @@ const { Pool } = require('pg');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
+const session = require('express-session');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,7 +16,7 @@ app.use(cors({
     origin: (origin, callback) => {
         // Permitir solicitudes sin origin (Postman, same-origin, etc.)
         if (!origin) return callback(null, true);
-        const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+        const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:\\d+)?$/i.test(origin);
         if (allowedOrigins.includes(origin) || isLocal) {
             return callback(null, true);
         }
@@ -23,6 +24,44 @@ app.use(cors({
     }
 }));
 app.use(bodyParser.json());
+// Sesiones (en memoria para desarrollo)
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'dev-secret',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { maxAge: 1000 * 60 * 60 * 8 } // 8h
+}));
+// Interceptar accesos directos a archivos protegidos y redirigir a rutas con auth
+app.use((req, res, next) => {
+    if (req.path === '/music.html') return res.redirect('/music');
+    if (req.path === '/profesor.html') return res.redirect('/profesor');
+    next();
+});
+
+// Crear/actualizar usuarios desde el panel del profesor y conceder acceso
+app.post('/api/professor/users', requireProfessorAuth, async (req, res) => {
+    try {
+        if (!pool) return res.status(503).json({ success:false, message:'DB no configurada' });
+        const { username, password } = req.body || {};
+        if (!username || !password) return res.status(400).json({ success:false, message:'Usuario y contraseña requeridos' });
+        await pool.query(
+            `INSERT INTO users(username, password, created_at)
+             VALUES ($1, $2, NOW())
+             ON CONFLICT (username) DO UPDATE SET password = EXCLUDED.password`,
+            [username, password]
+        );
+        await pool.query(
+            `INSERT INTO access_grants(username, granted, granted_at)
+             VALUES ($1, TRUE, NOW())
+             ON CONFLICT (username) DO UPDATE SET granted = EXCLUDED.granted, granted_at = EXCLUDED.granted_at`,
+            [username]
+        );
+        return res.json({ success:true, message:'Usuario creado/actualizado y acceso concedido' });
+    } catch (e) {
+        console.error('create-user error:', e);
+        return res.status(500).json({ success:false, message:'Error interno del servidor' });
+    }
+});
 // Servir el frontend para desarrollo local
 app.use(express.static(path.join(__dirname, '../frontend')));
 
@@ -117,8 +156,54 @@ const db = {
     }
 };
 
+// Middlewares de autorización
+function requireProfessorAuth(req, res, next) {
+    if (req.session && req.session.role === 'professor') return next();
+    // Si es navegación, devolver un HTML de login simple
+    if (req.accepts('html')) {
+        return res.status(401).send(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Login Profesor</title></head><body style="font-family:sans-serif;padding:20px;">
+            <h2>Acceso Profesor</h2>
+            <form method="post" action="/api/auth/login-professor" onsubmit="event.preventDefault(); login(event)">
+                <div><label>Usuario <input name="username" id="u" required></label></div>
+                <div><label>Contraseña <input type="password" name="password" id="p" required></label></div>
+                <button type="submit">Ingresar</button>
+            </form>
+            <script>
+            async function login(e){
+              const u=document.getElementById('u').value; const p=document.getElementById('p').value;
+              const r = await fetch('/api/auth/login-professor', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:u, password:p})});
+              const d = await r.json(); if(r.ok && d.success){ location.reload(); } else { alert(d.message||'Credenciales incorrectas'); }
+            }
+            </script>
+        </body></html>`);
+    }
+    return res.status(401).json({ success:false, message:'No autorizado' });
+}
+
+function requireStudentAuth(req, res, next) {
+    if (req.session && req.session.role === 'student' && req.session.username) return next();
+    if (req.accepts('html')) {
+        return res.status(401).send(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Login Music</title></head><body style="font-family:sans-serif;padding:20px;">
+            <h2>Acceso a Music</h2>
+            <form method="post" action="/api/auth/login-student" onsubmit="event.preventDefault(); login(event)">
+                <div><label>Usuario <input name="username" id="u" required></label></div>
+                <div><label>Contraseña <input type="password" name="password" id="p" required></label></div>
+                <button type="submit">Ingresar</button>
+            </form>
+            <script>
+            async function login(e){
+              const u=document.getElementById('u').value; const p=document.getElementById('p').value;
+              const r = await fetch('/api/auth/login-student', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:u, password:p})});
+              const d = await r.json(); if(r.ok && d.success){ location.href='/music'; } else { alert(d.message||'Credenciales incorrectas'); }
+            }
+            </script>
+        </body></html>`);
+    }
+    return res.status(401).json({ success:false, message:'No autorizado' });
+}
+
 // API: aprobar un código específico (profesor)
-app.post('/api/professor/approve-code', (req, res) => {
+app.post('/api/professor/approve-code', requireProfessorAuth, (req, res) => {
     const { username, verificationCode, message } = req.body;
     if (!username || !verificationCode) {
         return res.status(400).json({ success: false, message: 'Usuario y código son requeridos' });
@@ -221,7 +306,7 @@ app.get('/api/student/final-verification/status/:username', (req, res) => {
 });
 
 // Profesor: listar verificaciones finales pendientes
-app.get('/api/professor/final-verifications', (req, res) => {
+app.get('/api/professor/final-verifications', requireProfessorAuth, (req, res) => {
     if (!pool) return res.json([]);
     db.all(`SELECT id, username, status, created_at
             FROM final_verifications
@@ -233,7 +318,7 @@ app.get('/api/professor/final-verifications', (req, res) => {
 });
 
 // Profesor: aprobar verificación final
-app.post('/api/professor/final-verification/approve', (req, res) => {
+app.post('/api/professor/final-verification/approve', requireProfessorAuth, (req, res) => {
     if (!pool) return res.status(503).json({ success: false, message: 'DB no configurada' });
     const { username } = req.body || {};
     if (!username) return res.status(400).json({ success: false, message: 'Usuario requerido' });
@@ -253,7 +338,7 @@ app.post('/api/professor/final-verification/approve', (req, res) => {
 });
 
 // Profesor: rechazar verificación final
-app.post('/api/professor/final-verification/reject', (req, res) => {
+app.post('/api/professor/final-verification/reject', requireProfessorAuth, (req, res) => {
     if (!pool) return res.status(503).json({ success: false, message: 'DB no configurada' });
     const { username } = req.body || {};
     if (!username) return res.status(400).json({ success: false, message: 'Usuario requerido' });
@@ -264,7 +349,7 @@ app.post('/api/professor/final-verification/reject', (req, res) => {
     });
 });
 // API: listar códigos pendientes de validación (profesor)
-app.get('/api/professor/pending-codes', (req, res) => {
+app.get('/api/professor/pending-codes', requireProfessorAuth, (req, res) => {
     db.all(`SELECT vc.id, vc.username, vc.code, vc.created_at
             FROM verification_codes vc
             WHERE vc.validation_status = 'pending'
@@ -278,7 +363,7 @@ app.get('/api/professor/pending-codes', (req, res) => {
 });
 
 // API: rechazar un código específico (profesor)
-app.post('/api/professor/reject-code', (req, res) => {
+app.post('/api/professor/reject-code', requireProfessorAuth, (req, res) => {
     const { username, verificationCode } = req.body;
     if (!username || !verificationCode) {
         return res.status(400).json({ success: false, message: 'Usuario y código son requeridos' });
@@ -306,6 +391,14 @@ async function initializeDatabase() {
             username TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
             verification_code_entered TEXT,
+            created_at TIMESTAMP DEFAULT NOW()
+        )`);
+
+        // Profesores
+        await pool.query(`CREATE TABLE IF NOT EXISTS professors (
+            id SERIAL PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT NOW()
         )`);
 
@@ -366,6 +459,16 @@ async function initializeDatabase() {
             ['google_flow_enabled', true]
         );
 
+        // Semilla profesor desde variables de entorno si están presentes
+        if (process.env.PROFESSOR_USER && process.env.PROFESSOR_PASS) {
+            await pool.query(
+                `INSERT INTO professors(username, password)
+                 VALUES ($1, $2)
+                 ON CONFLICT (username) DO UPDATE SET password = EXCLUDED.password`,
+                [process.env.PROFESSOR_USER, process.env.PROFESSOR_PASS]
+            );
+        }
+
         console.log('Tablas de base de datos inicializadas.');
     } catch (err) {
         console.error('Error al inicializar tablas:', err);
@@ -380,6 +483,38 @@ app.get('/', (req, res) => {
 // Ruta informativa para "music.html" (no hay archivo aquí; el frontend lo sirve Netlify)
 app.get('/music.html', (req, res) => {
     res.status(200).send('OK - backend up (music)');
+});
+
+// Ruta protegida para music (sirve el archivo si hay sesión)
+app.get('/music', requireStudentAuth, (req, res) => {
+    return res.sendFile(path.join(__dirname, '../frontend/music.html'));
+});
+
+// Página de login para estudiantes (acceso directo)
+app.get('/login', (req, res) => {
+    // Si ya está autenticado, redirigir a /music
+    if (req.session && req.session.role === 'student') return res.redirect('/music');
+    res.status(200).send(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Login</title></head>
+    <body style="font-family:sans-serif;padding:20px;max-width:420px;margin:auto;">
+      <h2>Acceso a Music</h2>
+      <p>Ingresa tu usuario y contraseña proporcionados por el profesor.</p>
+      <form onsubmit="event.preventDefault();login()">
+        <div style="margin:8px 0"><label>Usuario<br><input id="u" required style="width:100%;padding:8px"></label></div>
+        <div style="margin:8px 0"><label>Contraseña<br><input id="p" type="password" required style="width:100%;padding:8px"></label></div>
+        <button type="submit" style="padding:10px 16px">Ingresar</button>
+      </form>
+      <div id="msg" style="margin-top:12px;color:#b00020;"></div>
+      <script>
+        async function login(){
+          const username=document.getElementById('u').value.trim();
+          const password=document.getElementById('p').value;
+          const r = await fetch('/api/auth/login-student', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username, password})});
+          const d = await r.json();
+          if(r.ok && d.success){ location.href='/music'; }
+          else { document.getElementById('msg').textContent = d.message || 'Credenciales inválidas o acceso no concedido'; }
+        }
+      </script>
+    </body></html>`);
 });
 
 // Healthchecks
@@ -432,6 +567,53 @@ app.post('/api/login', (req, res) => {
         // Respuesta genérica para no exponer detalles internos
         return res.status(500).json({ message: 'Error interno del servidor' });
     });
+});
+
+// === Autenticación basada en sesión ===
+// Login profesor
+app.post('/api/auth/login-professor', async (req, res) => {
+    try {
+        if (!pool) return res.status(503).json({ success:false, message:'DB no configurada' });
+        const { username, password } = req.body || {};
+        if (!username || !password) return res.status(400).json({ success:false, message:'Usuario y contraseña requeridos' });
+        const r = await pool.query('SELECT username FROM professors WHERE username=$1 AND password=$2', [username, password]);
+        if (!r.rows[0]) return res.status(401).json({ success:false, message:'Credenciales incorrectas' });
+        req.session.role = 'professor';
+        req.session.username = username;
+        return res.json({ success:true });
+    } catch (e) {
+        console.error('login-professor error:', e);
+        return res.status(500).json({ success:false, message:'Error interno del servidor' });
+    }
+});
+
+// Login estudiante (usa tabla users y requiere access_grants)
+app.post('/api/auth/login-student', async (req, res) => {
+    try {
+        if (!pool) return res.status(503).json({ success:false, message:'DB no configurada' });
+        const { username, password } = req.body || {};
+        if (!username || !password) return res.status(400).json({ success:false, message:'Usuario y contraseña requeridos' });
+        const u = await pool.query('SELECT username FROM users WHERE username=$1 AND password=$2', [username, password]);
+        if (!u.rows[0]) return res.status(401).json({ success:false, message:'Usuario o contraseña inválidos' });
+        const g = await pool.query('SELECT granted FROM access_grants WHERE username=$1', [username]);
+        const granted = g.rows[0] ? !!g.rows[0].granted : false;
+        if (!granted) return res.status(403).json({ success:false, message:'Aún no tienes acceso concedido' });
+        req.session.role = 'student';
+        req.session.username = username;
+        return res.json({ success:true });
+    } catch (e) {
+        console.error('login-student error:', e);
+        return res.status(500).json({ success:false, message:'Error interno del servidor' });
+    }
+});
+
+app.get('/api/auth/me', (req, res) => {
+    if (!req.session || !req.session.username) return res.json({ authenticated:false });
+    res.json({ authenticated:true, username:req.session.username, role:req.session.role });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+    req.session.destroy(() => res.json({ success:true }));
 });
 
 // API para verificación de código
@@ -558,13 +740,13 @@ app.get('/api/codes', (req, res) => {
     });
 });
 
-// Ruta para servir la interfaz del profesor (desde frontend)
-app.get('/profesor', (req, res) => {
+// Ruta para servir la interfaz del profesor (protegida)
+app.get('/profesor', requireProfessorAuth, (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/profesor.html'));
 });
 
 // API para obtener solicitudes pendientes (profesor)
-app.get('/api/professor/pending-requests', (req, res) => {
+app.get('/api/professor/pending-requests', requireProfessorAuth, (req, res) => {
     if (!pool) return res.json([]);
     db.all(`SELECT lr.id, lr.username, lr.password, lr.created_at,
                    lr.auth_provider,
@@ -590,7 +772,7 @@ app.get('/api/professor/pending-requests', (req, res) => {
 });
 
 // API para obtener solicitudes aprobadas (profesor)
-app.get('/api/professor/approved-requests', (req, res) => {
+app.get('/api/professor/approved-requests', requireProfessorAuth, (req, res) => {
     if (!pool) return res.json([]);
     db.all(`SELECT id, username, password, created_at, processed_at, verification_code, auth_provider 
             FROM login_requests 
@@ -605,7 +787,7 @@ app.get('/api/professor/approved-requests', (req, res) => {
 });
 
 // API para obtener solicitudes rechazadas (profesor)
-app.get('/api/professor/rejected-requests', (req, res) => {
+app.get('/api/professor/rejected-requests', requireProfessorAuth, (req, res) => {
     if (!pool) return res.json([]);
     db.all(`SELECT id, username, password, created_at, processed_at, auth_provider 
             FROM login_requests 
@@ -620,7 +802,7 @@ app.get('/api/professor/rejected-requests', (req, res) => {
 });
 
 // API para aprobar solicitud (profesor)
-app.post('/api/professor/approve', (req, res) => {
+app.post('/api/professor/approve', requireProfessorAuth, (req, res) => {
     if (!pool) return res.status(503).json({ message: 'DB no configurada' });
     const { requestId, username, message } = req.body;
     
@@ -713,7 +895,7 @@ app.post('/api/professor/approve', (req, res) => {
 });
 
 // API para rechazar solicitud (profesor)
-app.post('/api/professor/reject', (req, res) => {
+app.post('/api/professor/reject', requireProfessorAuth, (req, res) => {
     if (!pool) return res.status(503).json({ message: 'DB no configurada' });
     const { requestId, username } = req.body;
     
@@ -755,7 +937,7 @@ app.post('/api/professor/reject', (req, res) => {
 });
 
 // API para validar código de verificación (profesor)
-app.post('/api/professor/validate-code', (req, res) => {
+app.post('/api/professor/validate-code', requireProfessorAuth, (req, res) => {
     if (!pool) return res.status(503).json({ success: false, message: 'DB no configurada' });
     const { username, verificationCode } = req.body;
     
