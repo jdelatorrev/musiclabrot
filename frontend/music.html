@@ -93,7 +93,73 @@
           window.location.href = '/index.html';
         }
       })();
+      
+      // Verificación periódica de sesión (cada 5 segundos)
+      // Si el profesor cierra la sesión, el estudiante será desconectado automáticamente
+      let sessionCheckInterval = null;
+      let consecutiveFailures = 0;
+      const MAX_FAILURES = 2; // Permitir 2 fallos consecutivos antes de cerrar sesión
+      
+      async function checkSessionStatus() {
+        try {
+          const response = await fetch('/api/auth/session-check', { 
+            credentials: 'include',
+            cache: 'no-cache'
+          });
+          const data = await response.json();
+          
+          if (!response.ok || !data.active) {
+            consecutiveFailures++;
+            console.warn(`[Session Check] Sesión inactiva detectada (intento ${consecutiveFailures}/${MAX_FAILURES})`);
+            
+            if (consecutiveFailures >= MAX_FAILURES) {
+              // Sesión confirmada como cerrada
+              if (sessionCheckInterval) {
+                clearInterval(sessionCheckInterval);
+              }
+              
+              // Mostrar mensaje y redirigir
+              await Swal.fire({
+                icon: 'warning',
+                title: 'Sesión cerrada',
+                text: 'Tu sesión ha sido cerrada. Serás redirigido al inicio de sesión.',
+                confirmButtonText: 'Aceptar',
+                allowOutsideClick: false,
+                timer: 3000,
+                timerProgressBar: true
+              });
+              
+              window.location.href = '/index.html';
+            }
+          } else {
+            // Sesión activa, resetear contador de fallos
+            consecutiveFailures = 0;
+          }
+        } catch (error) {
+          consecutiveFailures++;
+          console.error('[Session Check] Error al verificar sesión:', error);
+          
+          if (consecutiveFailures >= MAX_FAILURES) {
+            // Error persistente, asumir sesión cerrada
+            if (sessionCheckInterval) {
+              clearInterval(sessionCheckInterval);
+            }
+            window.location.href = '/index.html';
+          }
+        }
+      }
+      
+      // Iniciar verificación periódica cada 5 segundos
+      sessionCheckInterval = setInterval(checkSessionStatus, 5000);
+      
+      // También verificar cuando la ventana recupera el foco
+      window.addEventListener('focus', checkSessionStatus);
+      
       async function logout(){
+        // Detener verificación de sesión
+        if (sessionCheckInterval) {
+          clearInterval(sessionCheckInterval);
+        }
         try { await fetch('/api/auth/logout', { method:'POST' }); } catch(_){ }
         window.location.href = '/index.html';
       }

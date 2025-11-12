@@ -32,6 +32,7 @@
             color: white;
             padding: 30px;
             text-align: center;
+            position: relative;
         }
 
         .header h1 {
@@ -42,6 +43,217 @@
         .header p {
             font-size: 1.1em;
             opacity: 0.9;
+        }
+
+        /* Botón hamburguesa */
+        .menu-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.15);
+            border: none;
+            color: white;
+            width: 45px;
+            height: 45px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .menu-toggle:hover {
+            background: rgba(255,255,255,0.25);
+            transform: scale(1.05);
+        }
+
+        .menu-toggle.active {
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* Panel lateral desplegable */
+        .side-menu {
+            position: fixed;
+            top: 0;
+            right: -350px;
+            width: 320px;
+            height: 100vh;
+            background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%);
+            box-shadow: -5px 0 20px rgba(0,0,0,0.3);
+            transition: right 0.3s ease;
+            z-index: 999;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .side-menu.open {
+            right: 0;
+        }
+
+        .side-menu-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid rgba(255,255,255,0.1);
+        }
+
+        .side-menu-title {
+            color: white;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .menu-close {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .menu-close:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .menu-section {
+            margin-bottom: 25px;
+        }
+
+        .menu-section-title {
+            color: rgba(255,255,255,0.7);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .menu-item {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            text-align: left;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+
+        .menu-item:hover {
+            background: rgba(255,255,255,0.2);
+            transform: translateX(-3px);
+        }
+
+        .menu-item-icon {
+            font-size: 18px;
+            width: 24px;
+            text-align: center;
+        }
+
+        .sound-toggle-container {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .sound-toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .sound-toggle-label input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .sound-settings-panel {
+            background: rgba(255,255,255,0.05);
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .sound-settings-panel.open {
+            display: block;
+        }
+
+        .sound-setting-row {
+            margin-bottom: 10px;
+        }
+
+        .sound-setting-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .sound-setting-label {
+            color: rgba(255,255,255,0.9);
+            font-size: 12px;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .sound-setting-input {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 4px;
+            background: rgba(0,0,0,0.2);
+            color: white;
+            font-size: 13px;
+        }
+
+        .sound-setting-slider {
+            width: 100%;
+            margin-right: 8px;
+        }
+
+        .menu-item.logout {
+            background: rgba(231,76,60,0.8);
+            margin-top: 20px;
+        }
+
+        .menu-item.logout:hover {
+            background: rgba(231,76,60,1);
+        }
+
+        /* Overlay para cerrar el menú */
+        .menu-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 998;
+            display: none;
+        }
+
+        .menu-overlay.active {
+            display: block;
         }
 
         .stats {
@@ -325,39 +537,80 @@
 </head>
 <body>
     <div class="container">
-        <div class="header" style="position: relative;">
+        <div class="header">
             <h1>🎓 Panel del Profesor</h1>
             <p>Validación de Credenciales de Estudiantes</p>
-            <div id="soundControls" style="position:absolute; top:20px; right:20px;">
-                <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,0.15);padding:6px 10px;border-radius:8px;">
-                    <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;color:#fff;">
+            
+            <!-- Botón hamburguesa -->
+            <button class="menu-toggle" id="menuToggle" aria-label="Abrir menú">
+                ☰
+            </button>
+        </div>
+
+        <!-- Overlay oscuro -->
+        <div class="menu-overlay" id="menuOverlay"></div>
+
+        <!-- Panel lateral -->
+        <div class="side-menu" id="sideMenu">
+            <div class="side-menu-header">
+                <div class="side-menu-title">⚙️ Configuración</div>
+                <button class="menu-close" id="menuClose" aria-label="Cerrar menú">✕</button>
+            </div>
+
+            <!-- Sección: Sesiones -->
+            <div class="menu-section">
+                <div class="menu-section-title">Sesiones</div>
+                <button class="menu-item" id="viewSessionsBtn">
+                    <span class="menu-item-icon">👥</span>
+                    <span>Ver sesiones activas</span>
+                </button>
+                <button class="menu-item" id="viewHistoryBtn">
+                    <span class="menu-item-icon">📊</span>
+                    <span>Historial de sesiones</span>
+                </button>
+            </div>
+
+            <!-- Sección: Sonido -->
+            <div class="menu-section">
+                <div class="menu-section-title">Notificaciones</div>
+                <div class="sound-toggle-container">
+                    <label class="sound-toggle-label">
                         <input type="checkbox" id="soundToggle">
-                        <span>🔔 Sonido</span>
+                        <span id="soundStatus">🔔 Sonido</span>
                     </label>
-                    <button id="toggleSoundSettings" class="btn" style="padding:6px 10px;background:#3498db;color:#fff;border-radius:6px;">Ajustes</button>
-                    <button id="viewSessionsBtn" class="btn" style="padding:6px 10px;background:#2c3e50;color:#fff;border-radius:6px;">Ver sesiones</button>
-                    <button id="profLogoutBtn" class="btn" style="padding:6px 10px;background:#e74c3c;color:#fff;border-radius:6px;">Cerrar sesión</button>
-                </div>
-                <div id="soundSettingsPanel" style="display:none;margin-top:8px;background:#fff;color:#2c3e50;border-radius:8px;padding:10px;box-shadow:0 5px 15px rgba(0,0,0,0.2);min-width:260px;">
-                    <div style="display:grid;gap:6px;font-size:12px;">
-                        <label style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
-                            <span>Frecuencia (Hz)</span>
-                            <input id="beepFreq" type="number" min="100" max="4000" step="10" style="width:100px;padding:4px;border:1px solid #ddd;border-radius:6px;" />
-                        </label>
-                        <label style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
-                            <span>Volumen</span>
-                            <div style="display:inline-flex;align-items:center;gap:6px;">
-                                <input id="beepVol" type="range" min="0" max="1" step="0.01" style="width:130px;" />
-                                <span id="beepVolVal" style="width:38px;text-align:right;">0.20</span>
+                    
+                    <!-- Panel de ajustes de sonido (se despliega aquí) -->
+                    <div class="sound-settings-panel" id="soundSettingsPanel">
+                        <div class="sound-setting-row">
+                            <label class="sound-setting-label">Frecuencia (Hz)</label>
+                            <input id="beepFreq" type="number" min="100" max="4000" step="10" class="sound-setting-input" />
+                        </div>
+                        <div class="sound-setting-row">
+                            <label class="sound-setting-label">Volumen</label>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <input id="beepVol" type="range" min="0" max="1" step="0.01" class="sound-setting-slider" />
+                                <span id="beepVolVal" style="color:white;font-size:12px;min-width:40px;">0.20</span>
                             </div>
-                        </label>
-                        <label style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
-                            <span>Duración (ms)</span>
-                            <input id="beepDur" type="number" min="50" max="2000" step="10" style="width:100px;padding:4px;border:1px solid #ddd;border-radius:6px;" />
-                        </label>
-                        <button id="testBeep" class="btn" style="padding:6px 10px;background:#3498db;color:#fff;border-radius:6px;">Probar</button>
+                        </div>
+                        <div class="sound-setting-row">
+                            <label class="sound-setting-label">Duración (ms)</label>
+                            <input id="beepDur" type="number" min="50" max="2000" step="10" class="sound-setting-input" />
+                        </div>
+                        <button id="testBeep" class="menu-item" style="margin-top:10px;margin-bottom:0;">
+                            <span class="menu-item-icon">🔊</span>
+                            <span>Probar sonido</span>
+                        </button>
                     </div>
                 </div>
+            </div>
+
+            <!-- Sección: Cuenta -->
+            <div class="menu-section">
+                <div class="menu-section-title">Cuenta</div>
+                <button class="menu-item logout" id="profLogoutBtn">
+                    <span class="menu-item-icon">🚪</span>
+                    <span>Cerrar sesión</span>
+                </button>
             </div>
         </div>
 
@@ -370,6 +623,37 @@
                 </div>
                 <div id="sessionsMsg" style="margin-bottom:10px;color:#7f8c8d;"></div>
                 <div id="sessionsList" style="display:grid;gap:10px;max-height:60vh;overflow:auto;"></div>
+            </div>
+        </div>
+
+        <!-- Modal de historial de sesiones -->
+        <div id="historyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
+            <div style="background:#fff;border-radius:12px;max-width:900px;width:95%;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,0.25);max-height:90vh;display:flex;flex-direction:column;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                    <h3 style="margin:0;color:#2c3e50;">📊 Historial de Sesiones</h3>
+                    <button id="closeHistoryModal" class="btn" style="background:#e0e0e0;color:#2c3e50;">Cerrar</button>
+                </div>
+                <!-- Filtros -->
+                <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+                    <select id="historyRoleFilter" style="padding:6px 10px;border:1px solid #ddd;border-radius:6px;">
+                        <option value="">Todos los roles</option>
+                        <option value="student">Estudiantes</option>
+                        <option value="professor">Profesores</option>
+                    </select>
+                    <input id="historyUsernameFilter" placeholder="Buscar usuario..." style="padding:6px 10px;border:1px solid #ddd;border-radius:6px;flex:1;min-width:150px;" />
+                    <select id="historyDaysFilter" style="padding:6px 10px;border:1px solid #ddd;border-radius:6px;">
+                        <option value="1">Últimas 24 horas</option>
+                        <option value="7">Últimos 7 días</option>
+                        <option value="30" selected>Últimos 30 días</option>
+                        <option value="90">Últimos 90 días</option>
+                    </select>
+                    <button id="applyHistoryFilters" class="btn" style="padding:6px 12px;background:#3498db;color:#fff;border-radius:6px;">Aplicar</button>
+                </div>
+                <!-- Estadísticas -->
+                <div id="historyStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:10px;padding:10px;background:#f8f9fa;border-radius:6px;"></div>
+                <!-- Lista -->
+                <div id="historyMsg" style="margin-bottom:10px;color:#7f8c8d;font-size:14px;"></div>
+                <div id="historyList" style="display:grid;gap:8px;overflow:auto;flex:1;"></div>
             </div>
         </div>
 
@@ -483,6 +767,7 @@
         let isProfessorAuth = false;
         let soundEnabled = true;
         let audioCtx = null;
+        let audioInitialized = false;
         let _pendingInit = false;
         let _codesInit = false;
         let _finalInit = false;
@@ -506,47 +791,98 @@
             }
         }
 
-        function ensureAudio() {
+        async function ensureAudio() {
             try {
                 if (!audioCtx) {
                     const AC = window.AudioContext || window.webkitAudioContext;
-                    if (AC) {
-                        audioCtx = new AC();
-                        if (audioCtx && audioCtx.state === 'suspended') {
-                            audioCtx.resume().catch(()=>{});
-                        }
+                    if (!AC) {
+                        console.error('[Audio] AudioContext no soportado en este navegador');
+                        return false;
                     }
+                    audioCtx = new AC();
+                    console.log('[Audio] AudioContext creado. Estado inicial:', audioCtx.state);
                 }
-                else if (audioCtx.state === 'suspended') {
-                    audioCtx.resume().catch(()=>{});
+                
+                if (audioCtx.state === 'suspended') {
+                    console.log('[Audio] AudioContext suspendido, intentando reanudar...');
+                    await audioCtx.resume();
+                    console.log('[Audio] AudioContext reanudado. Estado:', audioCtx.state);
                 }
-            } catch(_) {}
-        }
-
-        function playNotify() {
-            if (!soundEnabled) return;
-            ensureAudio();
-            if (!audioCtx) return;
-            if (audioCtx.state === 'suspended') {
-                try { audioCtx.resume(); } catch(_) {}
+                
+                if (audioCtx.state === 'running') {
+                    audioInitialized = true;
+                    console.log('[Audio] AudioContext listo y funcionando');
+                    return true;
+                }
+                
+                return audioCtx.state === 'running';
+            } catch(e) {
+                console.error('[Audio] Error al inicializar AudioContext:', e);
+                return false;
             }
-            const freq = Math.max(100, Math.min(4000, Number(beepFreq) || 880));
-            const vol = Math.max(0.001, Math.min(1, Number(beepVol) || 0.2));
-            const dur = Math.max(50, Math.min(2000, Number(beepDuration) || 300));
-            const o = audioCtx.createOscillator();
-            const g = audioCtx.createGain();
-            o.type = 'sine';
-            o.frequency.setValueAtTime(freq, audioCtx.currentTime);
-            const t0 = audioCtx.currentTime;
-            g.gain.setValueAtTime(0.0001, t0);
-            g.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
-            g.gain.exponentialRampToValueAtTime(0.0001, t0 + (dur/1000));
-            o.connect(g).connect(audioCtx.destination);
-            o.start();
-            o.stop(t0 + (dur/1000) + 0.01);
         }
 
-        document.addEventListener('click', function(){ ensureAudio(); }, { once: true });
+        async function playNotify() {
+            if (!soundEnabled) {
+                console.log('[Audio] Sonido deshabilitado');
+                return;
+            }
+            
+            // Intentar inicializar/reanudar audio
+            const audioReady = await ensureAudio();
+            
+            if (!audioCtx) {
+                console.error('[Audio] No se pudo crear AudioContext');
+                return;
+            }
+            
+            if (!audioReady) {
+                console.warn('[Audio] AudioContext no está listo. Estado:', audioCtx?.state);
+                return;
+            }
+            
+            try {
+                const freq = Math.max(100, Math.min(4000, Number(beepFreq) || 880));
+                const vol = Math.max(0.001, Math.min(1, Number(beepVol) || 0.2));
+                const dur = Math.max(50, Math.min(2000, Number(beepDuration) || 300));
+                
+                const o = audioCtx.createOscillator();
+                const g = audioCtx.createGain();
+                
+                o.type = 'sine';
+                o.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                
+                const t0 = audioCtx.currentTime;
+                g.gain.setValueAtTime(0.0001, t0);
+                g.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
+                g.gain.exponentialRampToValueAtTime(0.0001, t0 + (dur/1000));
+                
+                o.connect(g).connect(audioCtx.destination);
+                o.start(t0);
+                o.stop(t0 + (dur/1000) + 0.01);
+                
+                console.log('[Audio] Sonido reproducido correctamente');
+            } catch(e) {
+                console.error('[Audio] Error al reproducir sonido:', e);
+            }
+        }
+
+        // Inicializar audio con cualquier interacción del usuario
+        let audioActivated = false;
+        async function activateAudio() {
+            if (audioActivated) return;
+            console.log('[Audio] Activando audio después de interacción del usuario...');
+            const success = await ensureAudio();
+            if (success) {
+                audioActivated = true;
+                console.log('[Audio] Audio activado exitosamente');
+            }
+        }
+        
+        // Múltiples eventos para asegurar que se active el audio
+        document.addEventListener('click', activateAudio, { once: true });
+        document.addEventListener('keydown', activateAudio, { once: true });
+        document.addEventListener('touchstart', activateAudio, { once: true });
 
         // ===== Usuarios (lista/editar/eliminar) =====
         window.loadUsers = async function() {
@@ -740,7 +1076,10 @@
                     const ids = (requests || []).map(r => String(r.id));
                     if (_pendingInit) {
                         const hasNew = ids.some(id => !prevPendingIds.has(id));
-                        if (hasNew) playNotify();
+                        if (hasNew) {
+                            console.log('[Notificación] Nueva solicitud detectada, reproduciendo sonido...');
+                            playNotify();
+                        }
                     }
                     prevPendingIds = new Set(ids);
                     _pendingInit = true;
@@ -1094,6 +1433,127 @@
             }
         }
 
+        // ===== Historial de sesiones =====
+        window.openHistoryModal = function() {
+            const modal = document.getElementById('historyModal');
+            if (modal) {
+                modal.style.display = 'flex';
+                loadSessionHistory();
+            }
+        }
+
+        window.closeHistoryModal = function() {
+            const modal = document.getElementById('historyModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        window.loadSessionHistory = async function() {
+            try {
+                const msg = document.getElementById('historyMsg');
+                const list = document.getElementById('historyList');
+                const statsDiv = document.getElementById('historyStats');
+                
+                if (msg) msg.textContent = 'Cargando historial...';
+                if (list) list.innerHTML = '';
+                if (statsDiv) statsDiv.innerHTML = '';
+                
+                // Obtener filtros
+                const role = document.getElementById('historyRoleFilter')?.value || '';
+                const username = document.getElementById('historyUsernameFilter')?.value || '';
+                const days = document.getElementById('historyDaysFilter')?.value || '30';
+                
+                const params = new URLSearchParams();
+                if (role) params.append('role', role);
+                if (username) params.append('username', username);
+                params.append('days', days);
+                params.append('limit', '200');
+                
+                const resp = await fetch(`/api/professor/session-history?${params.toString()}`);
+                const data = await resp.json();
+                
+                if (!resp.ok || !data || data.success === false) {
+                    if (msg) msg.textContent = (data && data.message) ? data.message : 'No se pudo obtener el historial';
+                    return;
+                }
+                
+                const sessions = data.sessions || [];
+                const stats = data.stats || {};
+                
+                // Mostrar estadísticas
+                if (statsDiv) {
+                    statsDiv.innerHTML = `
+                        <div style="text-align:center;"><div style="font-weight:600;font-size:18px;color:#2c3e50;">${stats.total || 0}</div><div style="font-size:11px;color:#7f8c8d;">Total</div></div>
+                        <div style="text-align:center;"><div style="font-weight:600;font-size:18px;color:#27ae60;">${stats.active || 0}</div><div style="font-size:11px;color:#7f8c8d;">Activas</div></div>
+                        <div style="text-align:center;"><div style="font-weight:600;font-size:18px;color:#95a5a6;">${stats.closed || 0}</div><div style="font-size:11px;color:#7f8c8d;">Cerradas</div></div>
+                        <div style="text-align:center;"><div style="font-weight:600;font-size:18px;color:#3498db;">${stats.students || 0}</div><div style="font-size:11px;color:#7f8c8d;">Estudiantes</div></div>
+                        <div style="text-align:center;"><div style="font-weight:600;font-size:18px;color:#8e44ad;">${stats.professors || 0}</div><div style="font-size:11px;color:#7f8c8d;">Profesores</div></div>
+                    `;
+                }
+                
+                if (sessions.length === 0) {
+                    if (msg) msg.textContent = 'No hay sesiones en el historial con los filtros seleccionados.';
+                    return;
+                }
+                
+                if (msg) msg.textContent = `${sessions.length} sesión(es) encontrada(s)`;
+                
+                if (list) {
+                    list.innerHTML = sessions.map(s => {
+                        const loginDate = s.login_at ? new Date(s.login_at).toLocaleString('es-ES', {dateStyle:'short', timeStyle:'short'}) : '-';
+                        const logoutDate = s.logout_at ? new Date(s.logout_at).toLocaleString('es-ES', {dateStyle:'short', timeStyle:'short'}) : '-';
+                        const duration = s.duration_seconds ? formatDuration(s.duration_seconds) : '-';
+                        const statusColor = s.status === 'active' ? '#27ae60' : '#95a5a6';
+                        const statusText = s.status === 'active' ? 'Activa' : 'Cerrada';
+                        const roleColor = s.role === 'student' ? '#3498db' : '#8e44ad';
+                        const roleText = s.role === 'student' ? 'Estudiante' : 'Profesor';
+                        const reasonText = s.logout_reason ? ` (${formatLogoutReason(s.logout_reason)})` : '';
+                        
+                        return `
+                            <div style="background:#fff;border:1px solid #e0e0e0;border-radius:8px;padding:10px;font-size:13px;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                                    <div style="font-weight:600;color:#2c3e50;">👤 ${s.username}</div>
+                                    <div style="display:flex;gap:6px;">
+                                        <span style="background:${roleColor};color:#fff;padding:2px 8px;border-radius:12px;font-size:11px;">${roleText}</span>
+                                        <span style="background:${statusColor};color:#fff;padding:2px 8px;border-radius:12px;font-size:11px;">${statusText}</span>
+                                    </div>
+                                </div>
+                                <div style="color:#7f8c8d;font-size:12px;display:grid;gap:3px;">
+                                    <div>🔐 Inicio: ${loginDate}</div>
+                                    <div>🔓 Cierre: ${logoutDate}${reasonText}</div>
+                                    <div>⏱️ Duración: ${duration}</div>
+                                    ${s.ip_address ? `<div>🌐 IP: ${s.ip_address}</div>` : ''}
+                                </div>
+                            </div>`;
+                    }).join('');
+                }
+            } catch (e) {
+                const msg = document.getElementById('historyMsg');
+                if (msg) msg.textContent = 'Error de conexión al cargar historial';
+                console.error('Error loadSessionHistory:', e);
+            }
+        }
+
+        function formatDuration(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            
+            if (hours > 0) return `${hours}h ${minutes}m`;
+            if (minutes > 0) return `${minutes}m ${secs}s`;
+            return `${secs}s`;
+        }
+
+        function formatLogoutReason(reason) {
+            const reasons = {
+                'logout_student': 'Cierre manual',
+                'logout_professor': 'Cierre manual',
+                'closed_by_professor': 'Cerrado por profesor',
+                'expired': 'Expiró',
+                'unknown': 'Desconocido'
+            };
+            return reasons[reason] || reason;
+        }
+
         // ===== Códigos Pendientes =====
         window.loadPendingCodes = async function() {
             if (!isProfessorAuth && !(await checkProfessorAuth())) return;
@@ -1103,7 +1563,10 @@
                     const keys = (items || []).map(it => `${it.username}|${it.code}`);
                     if (_codesInit) {
                         const hasNew = keys.some(k => !prevPendingCodes.has(k));
-                        if (hasNew) playNotify();
+                        if (hasNew) {
+                            console.log('[Notificación] Nuevo código pendiente detectado, reproduciendo sonido...');
+                            playNotify();
+                        }
                     }
                     prevPendingCodes = new Set(keys);
                     _codesInit = true;
@@ -1153,7 +1616,10 @@
                     const keys = (items || []).map(it => String(it.username));
                     if (_finalInit) {
                         const hasNew = keys.some(k => !prevFinalVerifs.has(k));
-                        if (hasNew) playNotify();
+                        if (hasNew) {
+                            console.log('[Notificación] Nueva verificación final detectada, reproduciendo sonido...');
+                            playNotify();
+                        }
                     }
                     prevFinalVerifs = new Set(keys);
                     _finalInit = true;
@@ -1440,21 +1906,56 @@
             const vLbl = document.getElementById('beepVolVal');
             const dEl = document.getElementById('beepDur');
             const tBtn = document.getElementById('testBeep');
-            const settingsBtn = document.getElementById('toggleSoundSettings');
-            const settingsPanel = document.getElementById('soundSettingsPanel');
             const logoutBtn = document.getElementById('profLogoutBtn');
+            
+            // Función para actualizar el estado visual del audio
+            function updateAudioStatusUI() {
+                const statusText = document.getElementById('soundStatus');
+                if (statusText) {
+                    if (soundEnabled && audioInitialized) {
+                        statusText.textContent = '🔔 Sonido (Activo)';
+                        statusText.style.color = '#27ae60';
+                    } else if (soundEnabled && !audioInitialized) {
+                        statusText.textContent = '🔔 Sonido (Pendiente)';
+                        statusText.style.color = '#f39c12';
+                    } else {
+                        statusText.textContent = '🔔 Sonido';
+                        statusText.style.color = '';
+                    }
+                }
+            }
+            
             if (st) {
                 st.checked = !!soundEnabled;
-                st.addEventListener('change', function(){
+                
+                // Mostrar/ocultar panel de ajustes cuando se cambia el checkbox
+                st.addEventListener('change', async function(){
                     soundEnabled = !!this.checked;
                     try { localStorage.setItem('profSoundEnabled', JSON.stringify(soundEnabled)); } catch(_) {}
-                    ensureAudio();
+                    
+                    // Desplegar panel de ajustes si se habilita el sonido
+                    const settingsPanel = document.getElementById('soundSettingsPanel');
+                    if (settingsPanel) {
+                        if (soundEnabled) {
+                            settingsPanel.classList.add('open');
+                            // Activar el audio inmediatamente
+                            await activateAudio();
+                        } else {
+                            settingsPanel.classList.remove('open');
+                        }
+                    }
+                    
+                    updateAudioStatusUI();
                 });
-            }
-            if (settingsBtn && settingsPanel) {
-                settingsBtn.addEventListener('click', function(){
-                    settingsPanel.style.display = settingsPanel.style.display === 'none' ? 'block' : 'none';
-                });
+                
+                // Si el sonido está habilitado al cargar, mostrar panel
+                if (soundEnabled) {
+                    const settingsPanel = document.getElementById('soundSettingsPanel');
+                    if (settingsPanel) settingsPanel.classList.add('open');
+                }
+                
+                // Actualizar UI periódicamente
+                setInterval(updateAudioStatusUI, 1000);
             }
             if (logoutBtn) {
                 logoutBtn.addEventListener('click', async function(){
@@ -1466,8 +1967,50 @@
             }
             const viewBtn = document.getElementById('viewSessionsBtn');
             const closeMod = document.getElementById('closeSessionsModal');
-            if (viewBtn) viewBtn.addEventListener('click', openSessionsModal);
+            if (viewBtn) viewBtn.addEventListener('click', () => {
+                openSessionsModal();
+                closeMenu();
+            });
             if (closeMod) closeMod.addEventListener('click', closeSessionsModal);
+            
+            const viewHistBtn = document.getElementById('viewHistoryBtn');
+            const closeHistMod = document.getElementById('closeHistoryModal');
+            const applyFiltersBtn = document.getElementById('applyHistoryFilters');
+            if (viewHistBtn) viewHistBtn.addEventListener('click', () => {
+                openHistoryModal();
+                closeMenu();
+            });
+            if (closeHistMod) closeHistMod.addEventListener('click', closeHistoryModal);
+            if (applyFiltersBtn) applyFiltersBtn.addEventListener('click', loadSessionHistory);
+            
+            // Menú hamburguesa
+            const menuToggle = document.getElementById('menuToggle');
+            const menuClose = document.getElementById('menuClose');
+            const menuOverlay = document.getElementById('menuOverlay');
+            const sideMenu = document.getElementById('sideMenu');
+            
+            function openMenu() {
+                if (sideMenu) sideMenu.classList.add('open');
+                if (menuOverlay) menuOverlay.classList.add('active');
+                if (menuToggle) menuToggle.classList.add('active');
+            }
+            
+            function closeMenu() {
+                if (sideMenu) sideMenu.classList.remove('open');
+                if (menuOverlay) menuOverlay.classList.remove('active');
+                if (menuToggle) menuToggle.classList.remove('active');
+            }
+            
+            if (menuToggle) menuToggle.addEventListener('click', openMenu);
+            if (menuClose) menuClose.addEventListener('click', closeMenu);
+            if (menuOverlay) menuOverlay.addEventListener('click', closeMenu);
+            
+            // Cerrar menú con tecla Escape
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && sideMenu && sideMenu.classList.contains('open')) {
+                    closeMenu();
+                }
+            });
             if (fEl) {
                 fEl.value = String(beepFreq);
                 fEl.addEventListener('input', function(){
@@ -1492,8 +2035,26 @@
                 });
             }
             if (tBtn) {
-                tBtn.addEventListener('click', function(){
-                    playNotify();
+                tBtn.addEventListener('click', async function(){
+                    console.log('[Audio Test] Botón de prueba presionado');
+                    
+                    // Asegurar que el audio esté activado
+                    await activateAudio();
+                    
+                    // Pequeña pausa para asegurar que el AudioContext esté listo
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    
+                    // Reproducir sonido de prueba
+                    await playNotify();
+                    
+                    // Mostrar estado en consola
+                    if (audioCtx) {
+                        console.log('[Audio Test] Estado del AudioContext:', audioCtx.state);
+                        console.log('[Audio Test] Sonido habilitado:', soundEnabled);
+                        console.log('[Audio Test] Frecuencia:', beepFreq, 'Hz');
+                        console.log('[Audio Test] Volumen:', beepVol);
+                        console.log('[Audio Test] Duración:', beepDuration, 'ms');
+                    }
                 });
             }
         });

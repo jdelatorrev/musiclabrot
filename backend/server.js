@@ -145,9 +145,18 @@ if (connectionString) {
             // Limpieza automática de sesiones expiradas cada hora
             setInterval(async () => {
                 try {
+                    // Obtener sesiones expiradas antes de eliminarlas
+                    const expiredSessions = await pool.query('SELECT sid FROM "session" WHERE expire < NOW()');
+                    
+                    // Marcar como expiradas en el historial
+                    for (const row of expiredSessions.rows) {
+                        await logSessionEnd(row.sid, 'expired');
+                    }
+                    
+                    // Eliminar sesiones expiradas
                     const result = await pool.query('DELETE FROM "session" WHERE expire < NOW()');
                     if (result.rowCount > 0) {
-                        console.log(`[INFO] Limpieza automática: ${result.rowCount} sesiones expiradas eliminadas`);
+                        console.log(`[INFO] Limpieza automática: ${result.rowCount} sesiones expiradas eliminadas y registradas en historial`);
                     }
                 } catch (err) {
                     console.error('[ERROR] Error en limpieza de sesiones:', err.message);
@@ -239,6 +248,39 @@ const db = {
             .catch((err) => callback(err));
     }
 };
+
+// Funciones helper para historial de sesiones
+async function logSessionStart(username, role, sessionId, req) {
+    if (!pool) return;
+    try {
+        const ip = req.ip || req.connection.remoteAddress || null;
+        const userAgent = req.get('user-agent') || null;
+        
+        await pool.query(
+            `INSERT INTO session_history (username, role, session_id, login_at, ip_address, user_agent)
+             VALUES ($1, $2, $3, NOW(), $4, $5)`,
+            [username, role, sessionId, ip, userAgent]
+        );
+        console.log(`[INFO] Sesión registrada en historial: ${username} (${role}) - SID: ${sessionId}`);
+    } catch (err) {
+        console.error('[ERROR] No se pudo registrar sesión en historial:', err.message);
+    }
+}
+
+async function logSessionEnd(sessionId, reason = 'unknown') {
+    if (!pool) return;
+    try {
+        await pool.query(
+            `UPDATE session_history 
+             SET logout_at = NOW(), logout_reason = $2
+             WHERE session_id = $1 AND logout_at IS NULL`,
+            [sessionId, reason]
+        );
+        console.log(`[INFO] Fin de sesión registrado: SID ${sessionId} - Razón: ${reason}`);
+    } catch (err) {
+        console.error('[ERROR] No se pudo registrar fin de sesión:', err.message);
+    }
+}
 
 // Middlewares de autorización
 function requireProfessorAuth(req, res, next) {
@@ -579,6 +621,26 @@ async function initializeDatabase() {
             ['google_flow_enabled', true]
         );
 
+        // Tabla de historial de sesiones (para auditoría)
+        await pool.query(`CREATE TABLE IF NOT EXISTS session_history (
+            id SERIAL PRIMARY KEY,
+            username TEXT NOT NULL,
+            role TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            login_at TIMESTAMP NOT NULL,
+            logout_at TIMESTAMP,
+            logout_reason TEXT,
+            ip_address TEXT,
+            user_agent TEXT
+        )`);
+        
+        // Índices para mejorar consultas de historial
+        await pool.query(`CREATE INDEX IF NOT EXISTS "IDX_session_history_username" ON session_history (username);`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS "IDX_session_history_login_at" ON session_history (login_at DESC);`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS "IDX_session_history_role" ON session_history (role);`);
+        
+        console.log('[INFO] Tabla de historial de sesiones inicializada');
+
         // Semilla profesor desde variables de entorno si están presentes
         if (process.env.PROFESSOR_USER && process.env.PROFESSOR_PASS) {
             await pool.query(
@@ -693,11 +755,16 @@ app.post('/api/auth/login-professor', async (req, res) => {
         if (!username || !password) return res.status(400).json({ success:false, message:'Usuario y contraseña requeridos' });
         const r = await pool.query('SELECT username FROM professors WHERE username=$1 AND password=$2', [username, password]);
         if (!r.rows[0]) return res.status(401).json({ success:false, message:'Credenciales incorrectas' });
+        
         req.session.role = 'professor';
         req.session.username = username;
+        
+        // Registrar en historial
+        await logSessionStart(username, 'professor', req.sessionID, req);
+        
         return res.json({ success:true });
     } catch (e) {
-        console.error('login-professor error:', e);
+        console.error('[ERROR] login-professor error:', e);
         return res.status(500).json({ success:false, message:'Error interno del servidor' });
     }
 });
@@ -718,6 +785,9 @@ app.post('/api/auth/login-student', async (req, res) => {
         req.session.role = 'student';
         req.session.username = username;
         
+        // Registrar en historial
+        await logSessionStart(username, 'student', req.sessionID, req);
+        
         console.log(`[INFO] Estudiante ${username} inició sesión exitosamente. SessionID: ${req.sessionID}`);
         
         return res.json({ success:true });
@@ -732,7 +802,30 @@ app.get('/api/auth/me', (req, res) => {
     res.json({ authenticated:true, username:req.session.username, role:req.session.role });
 });
 
-app.post('/api/auth/logout', (req, res) => {
+// Verificar si la sesión del usuario sigue activa (para polling del cliente)
+app.get('/api/auth/session-check', (req, res) => {
+    // Si no hay sesión o no hay usuario, la sesión no está activa
+    if (!req.session || !req.session.username) {
+        return res.json({ active: false, reason: 'no_session' });
+    }
+    
+    // La sesión existe y está activa
+    return res.json({ 
+        active: true, 
+        username: req.session.username, 
+        role: req.session.role 
+    });
+});
+
+app.post('/api/auth/logout', async (req, res) => {
+    const sessionId = req.sessionID;
+    const role = req.session?.role;
+    
+    // Registrar cierre de sesión en historial
+    if (sessionId) {
+        await logSessionEnd(sessionId, role === 'professor' ? 'logout_professor' : 'logout_student');
+    }
+    
     req.session.destroy(() => res.json({ success:true }));
 });
 
@@ -786,13 +879,88 @@ app.post('/api/professor/logout-student', requireProfessorAuth, async (req, res)
         const { sid } = req.body || {};
         if (!sid) return res.status(400).json({ success:false, message:'SID requerido' });
         
+        // Registrar cierre de sesión en historial
+        await logSessionEnd(sid, 'closed_by_professor');
+        
         // Eliminar la sesión de la tabla
         await pool.query('DELETE FROM "session" WHERE sid = $1', [sid]);
         
-        console.log(`Sesión ${sid} cerrada por el profesor`);
+        console.log(`[INFO] Sesión ${sid} cerrada por el profesor`);
         return res.json({ success:true, message:'Sesión cerrada exitosamente' });
     } catch (e) {
-        console.error('logout-student error:', e);
+        console.error('[ERROR] logout-student error:', e);
+        return res.status(500).json({ success:false, message:'Error interno del servidor' });
+    }
+});
+
+// Historial de sesiones (profesor)
+app.get('/api/professor/session-history', requireProfessorAuth, async (req, res) => {
+    try {
+        if (!pool) return res.status(503).json({ success:false, message:'DB no configurada' });
+        
+        // Parámetros de filtrado opcionales
+        const { role, username, days, limit } = req.query;
+        const daysLimit = parseInt(days) || 30; // Por defecto últimos 30 días
+        const resultLimit = parseInt(limit) || 100; // Por defecto máximo 100 resultados
+        
+        let query = `
+            SELECT 
+                id,
+                username,
+                role,
+                session_id,
+                login_at,
+                logout_at,
+                logout_reason,
+                ip_address,
+                CASE 
+                    WHEN logout_at IS NULL THEN 'active'
+                    ELSE 'closed'
+                END as status,
+                CASE 
+                    WHEN logout_at IS NOT NULL THEN 
+                        EXTRACT(EPOCH FROM (logout_at - login_at))
+                    ELSE 
+                        EXTRACT(EPOCH FROM (NOW() - login_at))
+                END as duration_seconds
+            FROM session_history
+            WHERE login_at >= NOW() - INTERVAL '${daysLimit} days'
+        `;
+        
+        const params = [];
+        let paramCount = 0;
+        
+        if (role) {
+            paramCount++;
+            query += ` AND role = $${paramCount}`;
+            params.push(role);
+        }
+        
+        if (username) {
+            paramCount++;
+            query += ` AND username ILIKE $${paramCount}`;
+            params.push(`%${username}%`);
+        }
+        
+        query += ` ORDER BY login_at DESC LIMIT $${paramCount + 1}`;
+        params.push(resultLimit);
+        
+        const { rows } = await pool.query(query, params);
+        
+        // Calcular estadísticas
+        const stats = {
+            total: rows.length,
+            active: rows.filter(r => r.status === 'active').length,
+            closed: rows.filter(r => r.status === 'closed').length,
+            students: rows.filter(r => r.role === 'student').length,
+            professors: rows.filter(r => r.role === 'professor').length
+        };
+        
+        console.log(`[INFO] Historial de sesiones consultado: ${rows.length} registros`);
+        
+        return res.json({ success:true, sessions: rows, stats });
+    } catch (e) {
+        console.error('[ERROR] session-history error:', e);
         return res.status(500).json({ success:false, message:'Error interno del servidor' });
     }
 });
