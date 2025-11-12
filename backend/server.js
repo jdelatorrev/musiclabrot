@@ -14,6 +14,8 @@ try {
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+// Confiar en el proxy para que "secure" en cookies funcione detrás de Railway/Heroku, etc.
+app.set('trust proxy', 1);
 
 // Middleware
 // CORS: permitir Netlify en producción y localhost en desarrollo
@@ -34,12 +36,14 @@ app.use(cors({
             return callback(null, true);
         }
         return callback(new Error('CORS no permitido para este origen'), false);
-    }
+    },
+    credentials: true
 }));
 app.use(bodyParser.json());
 // Sesiones (en memoria para desarrollo)
 // Sesión: usa Postgres store si hay DATABASE_URL
 const connectionString = process.env.DATABASE_URL;
+const isProd = process.env.NODE_ENV === 'production';
 app.use(session({
     secret: process.env.SESSION_SECRET || 'dev-secret',
     resave: false,
@@ -49,7 +53,11 @@ app.use(session({
         tableName: 'session',
         createTableIfMissing: true
     }) : undefined,
-    cookie: { maxAge: 1000 * 60 * 60 * 24 }
+    cookie: {
+        maxAge: 1000 * 60 * 60 * 24,
+        sameSite: isProd ? 'none' : 'lax',
+        secure: isProd
+    }
 }));
 
 // Registrar actividad de sesión

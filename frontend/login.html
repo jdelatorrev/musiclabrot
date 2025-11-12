@@ -45,7 +45,7 @@
         const username = document.getElementById('username').value.trim();
         const password = document.getElementById('password').value;
         try {
-          const r = await fetch('/api/auth/login-student', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username, password }) });
+          const r = await fetch('/api/auth/login-student', { method:'POST', headers:{'Content-Type':'application/json'}, credentials: 'include', body: JSON.stringify({ username, password }) });
           const d = await r.json().catch(()=>({}));
           if (r.ok && d && d.success){
             window.location.href = '/music';
