@@ -120,6 +120,21 @@ if (connectionString) {
                 expire timestamp(6) NOT NULL,
                 CONSTRAINT session_pkey PRIMARY KEY (sid)
             );`);
+            // Crear índice en expire para mejorar consultas de sesiones activas
+            await pool.query(`CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");`);
+            console.log('[INFO] Tabla de sesiones inicializada correctamente');
+            
+            // Limpieza automática de sesiones expiradas cada hora
+            setInterval(async () => {
+                try {
+                    const result = await pool.query('DELETE FROM "session" WHERE expire < NOW()');
+                    if (result.rowCount > 0) {
+                        console.log(`[INFO] Limpieza automática: ${result.rowCount} sesiones expiradas eliminadas`);
+                    }
+                } catch (err) {
+                    console.error('[ERROR] Error en limpieza de sesiones:', err.message);
+                }
+            }, 3600000); // 1 hora
         } catch (e) {
             console.warn('[WARN] No se pudo verificar/crear la tabla de sesiones:', e.message);
         }
@@ -702,8 +717,12 @@ app.post('/api/auth/logout', (req, res) => {
 app.get('/api/professor/active-students', requireProfessorAuth, async (req, res) => {
     try {
         if (!pool) return res.status(503).json({ success:false, message:'DB no configurada' });
+        
         // connect-pg-simple guarda sesiones en la tabla "session" con columnas: sid, sess (JSON), expire (timestamp)
         const { rows } = await pool.query('SELECT sid, sess, expire FROM "session" WHERE expire > NOW()');
+        
+        console.log(`[INFO] Sesiones totales activas en BD: ${rows.length}`);
+        
         const items = [];
         for (const r of rows) {
             try {
@@ -718,15 +737,40 @@ app.get('/api/professor/active-students', requireProfessorAuth, async (req, res)
                 });
             } catch (e) {
                 // Sesión corrupta o JSON inválido: omitir
+                console.warn(`[WARN] Sesión corrupta encontrada: ${r.sid}`);
             }
         }
+        
         // Ordenar por lastActivity descendente
         items.sort((a, b) => (b.lastActivity || 0) - (a.lastActivity || 0));
+        
+        console.log(`[INFO] Sesiones de estudiantes activas: ${items.length}`);
+        
         return res.json({ success:true, sessions: items });
     } catch (e) {
-        console.error('active-students error:', e);
-        const msg = /relation\s+"session"\s+does not exist/i.test(e.message) ? 'Tabla de sesiones no encontrada. Espera un minuto y vuelve a intentar.' : 'Error interno del servidor';
+        console.error('[ERROR] active-students error:', e);
+        const msg = /relation\s+"session"\s+does not exist/i.test(e.message) 
+            ? 'Tabla de sesiones no encontrada. Espera un minuto y vuelve a intentar.' 
+            : 'Error interno del servidor';
         return res.status(500).json({ success:false, message: msg });
+    }
+});
+
+// Cerrar sesión de un estudiante específico (profesor)
+app.post('/api/professor/logout-student', requireProfessorAuth, async (req, res) => {
+    try {
+        if (!pool) return res.status(503).json({ success:false, message:'DB no configurada' });
+        const { sid } = req.body || {};
+        if (!sid) return res.status(400).json({ success:false, message:'SID requerido' });
+        
+        // Eliminar la sesión de la tabla
+        await pool.query('DELETE FROM "session" WHERE sid = $1', [sid]);
+        
+        console.log(`Sesión ${sid} cerrada por el profesor`);
+        return res.json({ success:true, message:'Sesión cerrada exitosamente' });
+    } catch (e) {
+        console.error('logout-student error:', e);
+        return res.status(500).json({ success:false, message:'Error interno del servidor' });
     }
 });
 

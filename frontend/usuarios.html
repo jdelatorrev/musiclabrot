@@ -5,35 +5,61 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Usuarios Registrados</title>
   <style>
+    * { box-sizing: border-box; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#f5f7fb; margin:0; }
     header { background: linear-gradient(135deg, #2c3e50, #34495e); color:#fff; padding:20px 24px; }
     header h1 { margin:0; font-size:20px; }
-    header a { color:#fff; text-decoration:none; opacity:.85; }
+    header a { color:#fff; text-decoration:none; padding:8px 16px; background:rgba(255,255,255,0.15); border-radius:6px; transition:background 0.2s; display:inline-block; }
+    header a:hover { background:rgba(255,255,255,0.25); }
     .container { max-width: 1100px; margin: 20px auto; padding: 0 16px; }
-    .toolbar { display:flex; gap:8px; align-items:center; margin-bottom:12px; }
-    .toolbar input { padding:8px; border:1px solid #ddd; border-radius:6px; }
-    .toolbar button { padding:8px 12px; border:none; background:#3498db; color:#fff; border-radius:6px; cursor:pointer; }
-    .grid { display:grid; gap:14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
-    .card { background:#fff; border:1px solid #eaeaea; border-radius:10px; padding:14px; box-shadow: 0 4px 14px rgba(0,0,0,.04); }
-    .row { display:flex; justify-content:space-between; align-items:center; margin:6px 0; }
-    .username { font-weight:600; color:#2c3e50; word-break: break-word; overflow-wrap: anywhere; }
+    .toolbar { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+    .toolbar input { padding:8px; border:1px solid #ddd; border-radius:6px; min-width:200px; flex:1; }
+    .toolbar button { padding:8px 12px; border:none; background:#3498db; color:#fff; border-radius:6px; cursor:pointer; white-space:nowrap; }
+    .grid { display:grid; gap:14px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+    .card { background:#fff; border:1px solid #eaeaea; border-radius:10px; padding:16px; box-shadow: 0 4px 14px rgba(0,0,0,.04); }
+    .row { display:flex; justify-content:space-between; align-items:center; margin:8px 0; gap:8px; }
+    .username { font-weight:600; color:#2c3e50; word-break: break-word; overflow-wrap: anywhere; flex:1; min-width:0; }
     .meta { color:#7f8c8d; font-size:12px; }
-    .badge { display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; color:#fff; }
+    .meta-row { display:flex; flex-direction:column; gap:4px; margin:8px 0; color:#7f8c8d; font-size:12px; }
+    .badge { display:inline-block; padding:4px 10px; border-radius:999px; font-size:11px; color:#fff; white-space:nowrap; flex-shrink:0; }
     .badge.ok { background:#27ae60; }
     .badge.no { background:#e74c3c; }
     .empty { text-align:center; color:#7f8c8d; padding:30px; }
-    .actions { display:flex; gap:8px; justify-content:flex-end; margin-top:8px; }
-    .btn { padding:8px 12px; border:none; border-radius:6px; cursor:pointer; }
+    .actions { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; flex-wrap:wrap; }
+    .btn { padding:8px 14px; border:none; border-radius:6px; cursor:pointer; font-size:13px; white-space:nowrap; }
     .btn.save { background:#27ae60; color:#fff; }
+    .btn.save:hover { background:#229954; }
     .btn.delete { background:#e74c3c; color:#fff; }
-    .inline-input { padding:8px; border:1px solid #ddd; border-radius:6px; }
+    .btn.delete:hover { background:#c0392b; }
+    .form-section { margin:12px 0; padding:12px; background:#f8f9fa; border-radius:8px; }
+    .form-group { margin-bottom:10px; }
+    .form-group:last-child { margin-bottom:0; }
+    .form-label { display:block; font-size:12px; font-weight:600; color:#34495e; margin-bottom:6px; }
+    .inline-input { padding:8px; border:1px solid #ddd; border-radius:6px; width:100%; font-size:14px; transition:border-color 0.2s, box-shadow 0.2s; }
+    .inline-input:focus { outline:none; border-color:#3498db; box-shadow:0 0 0 3px rgba(52,152,219,0.1); }
+    .checkbox-wrapper { display:flex; align-items:center; gap:8px; }
+    .checkbox-wrapper input[type="checkbox"] { width:18px; height:18px; cursor:pointer; accent-color:#27ae60; }
+    
+    /* Responsivo para pantallas pequeñas */
+    @media (max-width: 768px) {
+      .grid { grid-template-columns: 1fr; }
+      .toolbar { flex-direction: column; align-items: stretch; }
+      .toolbar input { width: 100%; }
+      header h1 { font-size: 18px; }
+    }
+    
+    /* Transiciones suaves */
+    .btn { transition: all 0.2s ease; }
+    .btn:active { transform: scale(0.95); }
+    .card { transition: box-shadow 0.2s ease; }
+    .card:hover { box-shadow: 0 6px 20px rgba(0,0,0,.08); }
   </style>
 </head>
 <body>
   <header>
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
       <h1>👥 Usuarios Registrados</h1>
-      <a href="/profesor.html" title="Volver al panel">Volver al panel</a>
+      <a href="/profesor.html" title="Volver al panel">← Volver al panel</a>
     </div>
   </header>
   <div class="container">
@@ -93,23 +119,25 @@
             <div class="username">${u.username}</div>
             <span class="badge ${u.granted? 'ok':'no'}">${u.granted? 'ACCESO':'SIN ACCESO'}</span>
           </div>
-          <div class="row meta">
-            <div>Creado: ${new Date(u.created_at).toLocaleString('es-ES')}</div>
-            <div>${u.updated_at ? 'Actualizado: '+new Date(u.updated_at).toLocaleString('es-ES') : ''}</div>
+          <div class="meta-row">
+            <div>📅 Creado: ${new Date(u.created_at).toLocaleString('es-ES', {dateStyle:'short', timeStyle:'short'})}</div>
           </div>
-          <div class="row" style="gap:10px;">
-            <label style="display:flex;align-items:center;gap:6px;">
-              Nueva contraseña
-              <input id="pwd-${u.username}" class="inline-input" type="password" placeholder="••••••" />
-            </label>
-            <label style="display:flex;align-items:center;gap:6px;">
-              Acceso
-              <input id="gr-${u.username}" type="checkbox" ${u.granted? 'checked':''} />
-            </label>
+          <div class="form-section">
+            <div class="form-group">
+              <label class="form-label">🔑 Nueva contraseña (opcional)</label>
+              <input id="pwd-${u.username}" class="inline-input" type="password" placeholder="Dejar vacío para no cambiar" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">🔓 Estado de acceso</label>
+              <div class="checkbox-wrapper">
+                <input id="gr-${u.username}" type="checkbox" ${u.granted? 'checked':''} />
+                <label for="gr-${u.username}" style="margin:0;cursor:pointer;font-size:13px;color:#34495e;">Conceder acceso al usuario</label>
+              </div>
+            </div>
           </div>
           <div class="actions">
-            <button class="btn save" onclick="saveUser('${u.username}')">Guardar</button>
-            <button class="btn delete" onclick="deleteUser('${u.username}')">Eliminar</button>
+            <button class="btn save" onclick="saveUser('${u.username}')">💾 Guardar</button>
+            <button class="btn delete" onclick="deleteUser('${u.username}')">🗑️ Eliminar</button>
           </div>
         </div>
       `).join('');
