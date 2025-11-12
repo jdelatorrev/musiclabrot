@@ -40,6 +40,12 @@
         msg.classList.toggle('success', !!success);
         msg.classList.toggle('error', !success);
       }
+      try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('closed') === '1') {
+          showMessage('Sesión cerrada', true);
+        }
+      } catch(_) {}
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const username = document.getElementById('profUser').value.trim();

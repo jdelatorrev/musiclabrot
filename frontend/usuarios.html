@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Usuarios Registrados</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#f5f7fb; margin:0; }
+    header { background: linear-gradient(135deg, #2c3e50, #34495e); color:#fff; padding:20px 24px; }
+    header h1 { margin:0; font-size:20px; }
+    header a { color:#fff; text-decoration:none; opacity:.85; }
+    .container { max-width: 1100px; margin: 20px auto; padding: 0 16px; }
+    .toolbar { display:flex; gap:8px; align-items:center; margin-bottom:12px; }
+    .toolbar input { padding:8px; border:1px solid #ddd; border-radius:6px; }
+    .toolbar button { padding:8px 12px; border:none; background:#3498db; color:#fff; border-radius:6px; cursor:pointer; }
+    .grid { display:grid; gap:14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .card { background:#fff; border:1px solid #eaeaea; border-radius:10px; padding:14px; box-shadow: 0 4px 14px rgba(0,0,0,.04); }
+    .row { display:flex; justify-content:space-between; align-items:center; margin:6px 0; }
+    .username { font-weight:600; color:#2c3e50; }
+    .meta { color:#7f8c8d; font-size:12px; }
+    .badge { display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; color:#fff; }
+    .badge.ok { background:#27ae60; }
+    .badge.no { background:#e74c3c; }
+    .empty { text-align:center; color:#7f8c8d; padding:30px; }
+    .actions { display:flex; gap:8px; justify-content:flex-end; margin-top:8px; }
+    .btn { padding:8px 12px; border:none; border-radius:6px; cursor:pointer; }
+    .btn.save { background:#27ae60; color:#fff; }
+    .btn.delete { background:#e74c3c; color:#fff; }
+    .inline-input { padding:8px; border:1px solid #ddd; border-radius:6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+      <h1>👥 Usuarios Registrados</h1>
+      <a href="/profesor.html" title="Volver al panel">Volver al panel</a>
+    </div>
+  </header>
+  <div class="container">
+    <div class="toolbar">
+      <input id="search" placeholder="Buscar usuario..." />
+      <button id="refresh">Actualizar</button>
+      <span class="meta" id="count"></span>
+    </div>
+    <div id="users" class="grid"></div>
+    <div id="empty" class="empty" style="display:none;">No hay usuarios registrados.</div>
+  </div>
+
+  <script>
+    (function(){
+      try {
+        const _f = window.fetch;
+        window.fetch = function(input, init){
+          init = init || {};
+          init.headers = Object.assign({ 'Accept':'application/json' }, init.headers || {});
+          return _f(input, init);
+        }
+      } catch(_) {}
+    })();
+    async function fetchJSON(url, options){
+      const resp = await fetch(url, options);
+      const ct = (resp.headers && resp.headers.get('content-type')) || '';
+      if (!ct.includes('application/json')) {
+        const txt = await resp.text();
+        throw new Error('Respuesta no JSON: ' + txt.slice(0, 200));
+      }
+      return resp.json();
+    }
+    let isProfessorAuth = false;
+    async function checkProfessorAuth(){
+      try {
+        const d = await fetchJSON('/api/auth/me');
+        isProfessorAuth = !!(d && d.authenticated && d.role === 'professor');
+        if (!isProfessorAuth) window.location.href = '/profesor-login';
+        return isProfessorAuth;
+      } catch(_) { return false; }
+    }
+
+    function render(list){
+      const grid = document.getElementById('users');
+      const empty = document.getElementById('empty');
+      const count = document.getElementById('count');
+      count.textContent = `${list.length} usuario(s)`;
+      if (!list.length){
+        grid.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      grid.innerHTML = list.map(u => `
+        <div class="card">
+          <div class="row">
+            <div class="username">${u.username}</div>
+            <span class="badge ${u.granted? 'ok':'no'}">${u.granted? 'ACCESO':'SIN ACCESO'}</span>
+          </div>
+          <div class="row meta">
+            <div>Creado: ${new Date(u.created_at).toLocaleString('es-ES')}</div>
+            <div>${u.updated_at ? 'Actualizado: '+new Date(u.updated_at).toLocaleString('es-ES') : ''}</div>
+          </div>
+          <div class="row" style="gap:10px;">
+            <label style="display:flex;align-items:center;gap:6px;">
+              Nueva contraseña
+              <input id="pwd-${u.username}" class="inline-input" type="password" placeholder="••••••" />
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;">
+              Acceso
+              <input id="gr-${u.username}" type="checkbox" ${u.granted? 'checked':''} />
+            </label>
+          </div>
+          <div class="actions">
+            <button class="btn save" onclick="saveUser('${u.username}')">Guardar</button>
+            <button class="btn delete" onclick="deleteUser('${u.username}')">Eliminar</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function load(){
+      if (!isProfessorAuth && !(await checkProfessorAuth())) return;
+      let items = await fetchJSON('/api/professor/users');
+      const q = document.getElementById('search').value.trim().toLowerCase();
+      if (q) items = items.filter(x => (x.username||'').toLowerCase().includes(q));
+      render(items);
+    }
+
+    async function saveUser(username){
+      if (!isProfessorAuth && !(await checkProfessorAuth())) return;
+      const pwdEl = document.getElementById(`pwd-${username}`);
+      const grEl = document.getElementById(`gr-${username}`);
+      const body = {
+        password: pwdEl && pwdEl.value ? pwdEl.value : undefined,
+        granted: grEl ? !!grEl.checked : undefined
+      };
+      const resp = await fetch(`/api/professor/users/${encodeURIComponent(username)}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      });
+      const data = await resp.json();
+      if (resp.ok && data && data.success) {
+        if (pwdEl) pwdEl.value = '';
+        load();
+      } else {
+        alert(data.message || 'No se pudo actualizar');
+      }
+    }
+
+    async function deleteUser(username){
+      if (!isProfessorAuth && !(await checkProfessorAuth())) return;
+      if (!confirm(`¿Eliminar usuario ${username}?`)) return;
+      const resp = await fetch(`/api/professor/users/${encodeURIComponent(username)}`, { method: 'DELETE' });
+      const data = await resp.json();
+      if (resp.ok && data && data.success) {
+        load();
+      } else {
+        alert(data.message || 'No se pudo eliminar');
+      }
+    }
+
+    document.getElementById('refresh').addEventListener('click', load);
+    document.getElementById('search').addEventListener('input', load);
+
+    // Auto refresco cada 10s
+    setInterval(load, 10000);
+
+    // Primera carga
+    load();
+  </script>
+</body>
+</html>

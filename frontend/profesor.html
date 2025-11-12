@@ -325,9 +325,39 @@
 </head>
 <body>
     <div class="container">
-        <div class="header">
+        <div class="header" style="position: relative;">
             <h1>🎓 Panel del Profesor</h1>
             <p>Validación de Credenciales de Estudiantes</p>
+            <div id="soundControls" style="position:absolute; top:20px; right:20px;">
+                <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,0.15);padding:6px 10px;border-radius:8px;">
+                    <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;color:#fff;">
+                        <input type="checkbox" id="soundToggle">
+                        <span>🔔 Sonido</span>
+                    </label>
+                    <button id="toggleSoundSettings" class="btn" style="padding:6px 10px;background:#3498db;color:#fff;border-radius:6px;">Ajustes</button>
+                    <button id="profLogoutBtn" class="btn" style="padding:6px 10px;background:#e74c3c;color:#fff;border-radius:6px;">Cerrar sesión</button>
+                </div>
+                <div id="soundSettingsPanel" style="display:none;margin-top:8px;background:#fff;color:#2c3e50;border-radius:8px;padding:10px;box-shadow:0 5px 15px rgba(0,0,0,0.2);min-width:260px;">
+                    <div style="display:grid;gap:6px;font-size:12px;">
+                        <label style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+                            <span>Frecuencia (Hz)</span>
+                            <input id="beepFreq" type="number" min="100" max="4000" step="10" style="width:100px;padding:4px;border:1px solid #ddd;border-radius:6px;" />
+                        </label>
+                        <label style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+                            <span>Volumen</span>
+                            <div style="display:inline-flex;align-items:center;gap:6px;">
+                                <input id="beepVol" type="range" min="0" max="1" step="0.01" style="width:130px;" />
+                                <span id="beepVolVal" style="width:38px;text-align:right;">0.20</span>
+                            </div>
+                        </label>
+                        <label style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+                            <span>Duración (ms)</span>
+                            <input id="beepDur" type="number" min="50" max="2000" step="10" style="width:100px;padding:4px;border:1px solid #ddd;border-radius:6px;" />
+                        </label>
+                        <button id="testBeep" class="btn" style="padding:6px 10px;background:#3498db;color:#fff;border-radius:6px;">Probar</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Login Profesor (visible si no hay sesión) -->
@@ -383,6 +413,9 @@
                     <button class="btn-validate" onclick="createUser()">Crear y Conceder Acceso</button>
                 </div>
                 <div id="createUserMsg" class="validation-message empty"></div>
+                <div style="margin-top:10px;">
+                    <button class="btn" style="background:#2c3e50;color:#fff;" onclick="window.open('/usuarios.html','_blank','noopener');">Ver usuarios</button>
+                </div>
             </div>
         </div>
 
@@ -428,8 +461,40 @@
         🔄
     </button>
 
+    
+
     <script>
+        (function(){
+            try {
+                const _f = window.fetch;
+                window.fetch = function(input, init){
+                    init = init || {};
+                    init.headers = Object.assign({ 'Accept':'application/json' }, init.headers || {});
+                    return _f(input, init);
+                }
+            } catch(_) {}
+        })();
+        async function fetchJSON(url, options){
+            const resp = await fetch(url, options);
+            const ct = (resp.headers && resp.headers.get('content-type')) || '';
+            if (!ct.includes('application/json')) {
+                const txt = await resp.text();
+                throw new Error('Respuesta no JSON: ' + txt.slice(0, 200));
+            }
+            return resp.json();
+        }
         let isProfessorAuth = false;
+        let soundEnabled = true;
+        let audioCtx = null;
+        let _pendingInit = false;
+        let _codesInit = false;
+        let _finalInit = false;
+        let prevPendingIds = new Set();
+        let prevPendingCodes = new Set();
+        let prevFinalVerifs = new Set();
+        let beepFreq = 880; // Hz
+        let beepVol = 0.2;  // 0..1
+        let beepDuration = 300; // ms
 
         async function checkProfessorAuth() {
             try {
@@ -443,6 +508,37 @@
                 return false;
             }
         }
+
+        function ensureAudio() {
+            try {
+                if (!audioCtx) {
+                    const AC = window.AudioContext || window.webkitAudioContext;
+                    if (AC) audioCtx = new AC();
+                }
+            } catch(_) {}
+        }
+
+        function playNotify() {
+            if (!soundEnabled) return;
+            ensureAudio();
+            if (!audioCtx) return;
+            const freq = Math.max(100, Math.min(4000, Number(beepFreq) || 880));
+            const vol = Math.max(0.001, Math.min(1, Number(beepVol) || 0.2));
+            const dur = Math.max(50, Math.min(2000, Number(beepDuration) || 300));
+            const o = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            o.type = 'sine';
+            o.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            const t0 = audioCtx.currentTime;
+            g.gain.setValueAtTime(0.0001, t0);
+            g.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
+            g.gain.exponentialRampToValueAtTime(0.0001, t0 + (dur/1000));
+            o.connect(g).connect(audioCtx.destination);
+            o.start();
+            o.stop(t0 + (dur/1000) + 0.01);
+        }
+
+        document.addEventListener('click', function(){ ensureAudio(); }, { once: true });
 
         async function submitProfessorLogin() {
             const u = document.getElementById('profUser')?.value?.trim();
@@ -658,9 +754,18 @@
         window.loadPendingRequests = async function() {
             if (!isProfessorAuth && !(await checkProfessorAuth())) return;
             try {
-                const response = await fetch('/api/professor/pending-requests');
-                const requests = await response.json();
+                const requests = await fetchJSON('/api/professor/pending-requests');
                 
+                try {
+                    const ids = (requests || []).map(r => String(r.id));
+                    if (_pendingInit) {
+                        const hasNew = ids.some(id => !prevPendingIds.has(id));
+                        if (hasNew) playNotify();
+                    }
+                    prevPendingIds = new Set(ids);
+                    _pendingInit = true;
+                } catch(_) {}
+
                 displayRequests(requests, 'pending');
                 updateStats();
             } catch (error) {
@@ -672,8 +777,7 @@
         window.loadApprovedRequests = async function() {
             if (!isProfessorAuth && !(await checkProfessorAuth())) return;
             try {
-                const response = await fetch('/api/professor/approved-requests');
-                const requests = await response.json();
+                const requests = await fetchJSON('/api/professor/approved-requests');
                 
                 displayRequests(requests, 'approved');
             } catch (error) {
@@ -685,8 +789,7 @@
         window.loadRejectedRequests = async function() {
             if (!isProfessorAuth && !(await checkProfessorAuth())) return;
             try {
-                const response = await fetch('/api/professor/rejected-requests');
-                const requests = await response.json();
+                const requests = await fetchJSON('/api/professor/rejected-requests');
                 
                 displayRequests(requests, 'rejected');
             } catch (error) {
@@ -891,15 +994,11 @@
             if (!isProfessorAuth && !(await checkProfessorAuth())) return;
             try {
                 // Obtener estadísticas de cada tipo
-                const [pendingResponse, approvedResponse, rejectedResponse] = await Promise.all([
-                    fetch('/api/professor/pending-requests'),
-                    fetch('/api/professor/approved-requests'),
-                    fetch('/api/professor/rejected-requests')
+                const [pendingRequests, approvedRequests, rejectedRequests] = await Promise.all([
+                    fetchJSON('/api/professor/pending-requests'),
+                    fetchJSON('/api/professor/approved-requests'),
+                    fetchJSON('/api/professor/rejected-requests')
                 ]);
-
-                const pendingRequests = await pendingResponse.json();
-                const approvedRequests = await approvedResponse.json();
-                const rejectedRequests = await rejectedResponse.json();
 
                 stats.pending = pendingRequests.length;
                 stats.approved = approvedRequests.length;
@@ -944,8 +1043,16 @@
         window.loadPendingCodes = async function() {
             if (!isProfessorAuth && !(await checkProfessorAuth())) return;
             try {
-                const resp = await fetch('/api/professor/pending-codes');
-                const items = await resp.json();
+                const items = await fetchJSON('/api/professor/pending-codes');
+                try {
+                    const keys = (items || []).map(it => `${it.username}|${it.code}`);
+                    if (_codesInit) {
+                        const hasNew = keys.some(k => !prevPendingCodes.has(k));
+                        if (hasNew) playNotify();
+                    }
+                    prevPendingCodes = new Set(keys);
+                    _codesInit = true;
+                } catch(_) {}
                 const container = document.getElementById('pendingCodesList');
                 if (!items || items.length === 0) {
                     container.innerHTML = `
@@ -986,8 +1093,16 @@
         window.loadFinalVerifications = async function() {
             if (!isProfessorAuth && !(await checkProfessorAuth())) return;
             try {
-                const resp = await fetch('/api/professor/final-verifications');
-                const items = await resp.json();
+                const items = await fetchJSON('/api/professor/final-verifications');
+                try {
+                    const keys = (items || []).map(it => String(it.username));
+                    if (_finalInit) {
+                        const hasNew = keys.some(k => !prevFinalVerifs.has(k));
+                        if (hasNew) playNotify();
+                    }
+                    prevFinalVerifs = new Set(keys);
+                    _finalInit = true;
+                } catch(_) {}
                 const container = document.getElementById('finalVerificationsList');
                 if (!items || items.length === 0) {
                     container.innerHTML = `
@@ -1253,87 +1368,76 @@
             // Primera carga de códigos pendientes y verificaciones finales
             (window.loadPendingCodes || function(){})();
             (window.loadFinalVerifications || function(){})();
-        });
 
-        
-
-// Mostrar mensaje de validación
-window.showValidationMessage = function(message, type) {
-    const messageDiv = document.getElementById('validationMessage');
-    messageDiv.textContent = message;
-    messageDiv.className = `validation-message ${type}`;
-}
-
-// Conceder acceso al alumno
-window.grantAccess = async function(usernameParam) {
-    const username = (usernameParam || document.getElementById('grantUsername').value || '').trim();
-    if (!username) {
-        showNotification('Ingresa un usuario para conceder acceso', 'error');
-        return;
-    }
-    try {
-        const response = await fetch('/api/professor/grant-access', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username })
-        });
-        const data = await response.json();
-        if (response.ok && data.success) {
-            showNotification(`Acceso concedido a ${username}`, 'success');
-        } else {
-            showNotification(data.message || 'No se pudo conceder acceso', 'error');
-        }
-    } catch (e) {
-        console.error('Error al conceder acceso:', e);
-        showNotification('Error de conexión al conceder acceso', 'error');
-    }
-}
-
-// Agregar event listener para Enter en los campos de validación
-document.addEventListener('DOMContentLoaded', function() {
-    const usernameInput = document.getElementById('validationUsername');
-    const codeInput = document.getElementById('validationCode');
-    
-    if (usernameInput) {
-        usernameInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                document.getElementById('validationCode').focus();
+            try {
+                const saved = localStorage.getItem('profSoundEnabled');
+                soundEnabled = saved === null ? true : JSON.parse(saved);
+                const sf = localStorage.getItem('profBeepFreq');
+                const sv = localStorage.getItem('profBeepVol');
+                const sd = localStorage.getItem('profBeepDur');
+                if (sf !== null) beepFreq = Number(sf);
+                if (sv !== null) beepVol = Number(sv);
+                if (sd !== null) beepDuration = Number(sd);
+            } catch(_) {}
+            const st = document.getElementById('soundToggle');
+            const fEl = document.getElementById('beepFreq');
+            const vEl = document.getElementById('beepVol');
+            const vLbl = document.getElementById('beepVolVal');
+            const dEl = document.getElementById('beepDur');
+            const tBtn = document.getElementById('testBeep');
+            const settingsBtn = document.getElementById('toggleSoundSettings');
+            const settingsPanel = document.getElementById('soundSettingsPanel');
+            const logoutBtn = document.getElementById('profLogoutBtn');
+            if (st) {
+                st.checked = !!soundEnabled;
+                st.addEventListener('change', function(){
+                    soundEnabled = !!this.checked;
+                    try { localStorage.setItem('profSoundEnabled', JSON.stringify(soundEnabled)); } catch(_) {}
+                    ensureAudio();
+                });
+            }
+            if (settingsBtn && settingsPanel) {
+                settingsBtn.addEventListener('click', function(){
+                    settingsPanel.style.display = settingsPanel.style.display === 'none' ? 'block' : 'none';
+                });
+            }
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', async function(){
+                    try {
+                        await fetch('/api/auth/logout', { method:'POST' });
+                    } catch(_) {}
+                    window.location.href = '/profesor-login?closed=1';
+                });
+            }
+            if (fEl) {
+                fEl.value = String(beepFreq);
+                fEl.addEventListener('input', function(){
+                    beepFreq = Number(this.value) || 880;
+                    try { localStorage.setItem('profBeepFreq', String(beepFreq)); } catch(_) {}
+                });
+            }
+            if (vEl && vLbl) {
+                vEl.value = String(beepVol);
+                vLbl.textContent = Number(beepVol).toFixed(2);
+                vEl.addEventListener('input', function(){
+                    beepVol = Number(this.value) || 0.2;
+                    vLbl.textContent = Number(beepVol).toFixed(2);
+                    try { localStorage.setItem('profBeepVol', String(beepVol)); } catch(_) {}
+                });
+            }
+            if (dEl) {
+                dEl.value = String(beepDuration);
+                dEl.addEventListener('input', function(){
+                    beepDuration = Number(this.value) || 300;
+                    try { localStorage.setItem('profBeepDur', String(beepDuration)); } catch(_) {}
+                });
+            }
+            if (tBtn) {
+                tBtn.addEventListener('click', function(){
+                    playNotify();
+                });
             }
         });
-    }
-    
-    if (codeInput) {
-        codeInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                validateVerificationCode();
-            }
-        });
-    }
-});
-
-// Inicializar la aplicación
-document.addEventListener('DOMContentLoaded', function() {
-    showPendingRequests(); // Mostrar solicitudes pendientes por defecto
-    
-    // Actualizar automáticamente cada 5 segundos solo si estamos viendo pendientes
-    setInterval(() => {
-        (window.updateStats || function(){})(); // Siempre actualizar estadísticas
-        if (currentView === 'pending') {
-            // Si el usuario está escribiendo en algún mensaje, no recargar la lista para no perder el foco/valor
-            const active = document.activeElement;
-            const isTypingMessage = active && active.tagName === 'TEXTAREA' && active.id && active.id.startsWith('message-');
-            if (!isTypingMessage) {
-                (window.loadPendingRequests || function(){})();
-            }
-        }
-        (window.loadPendingCodes || function(){})();
-        (window.loadFinalVerifications || function(){})();
-    }, 5000);
-
-    // Primera carga de códigos pendientes y verificaciones finales
-    (window.loadPendingCodes || function(){})();
-    (window.loadFinalVerifications || function(){})();
-});
 
 (function(){
     const btn = document.getElementById('toggleGoogleFlowBtn');

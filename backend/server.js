@@ -36,7 +36,7 @@ app.use(session({
     secret: process.env.SESSION_SECRET || 'dev-secret',
     resave: false,
     saveUninitialized: false,
-    cookie: { maxAge: 1000 * 60 * 60 * 8 } // 8h
+    cookie: { maxAge: 1000 * 60 * 60 * 24 } // 24h
 }));
 // Interceptar accesos directos a archivos protegidos y redirigir a rutas con auth
 app.use((req, res, next) => {
