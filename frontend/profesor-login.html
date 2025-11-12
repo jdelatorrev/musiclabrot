@@ -44,6 +44,8 @@
         const params = new URLSearchParams(window.location.search);
         if (params.get('closed') === '1') {
           showMessage('Sesión cerrada', true);
+        } else if (params.get('expired') === '1') {
+          showMessage('Sesión expirada, vuelve a iniciar sesión', false);
         }
       } catch(_) {}
       form.addEventListener('submit', async (e) => {

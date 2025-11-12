@@ -335,6 +335,7 @@
                         <span>🔔 Sonido</span>
                     </label>
                     <button id="toggleSoundSettings" class="btn" style="padding:6px 10px;background:#3498db;color:#fff;border-radius:6px;">Ajustes</button>
+                    <button id="viewSessionsBtn" class="btn" style="padding:6px 10px;background:#2c3e50;color:#fff;border-radius:6px;">Ver sesiones</button>
                     <button id="profLogoutBtn" class="btn" style="padding:6px 10px;background:#e74c3c;color:#fff;border-radius:6px;">Cerrar sesión</button>
                 </div>
                 <div id="soundSettingsPanel" style="display:none;margin-top:8px;background:#fff;color:#2c3e50;border-radius:8px;padding:10px;box-shadow:0 5px 15px rgba(0,0,0,0.2);min-width:260px;">
@@ -360,20 +361,19 @@
             </div>
         </div>
 
-        <!-- Login Profesor (visible si no hay sesión) -->
-        <div id="profLogin" style="display:none;padding:16px 30px;background:#fff3cd;border:1px solid #ffeeba;margin:20px;border-radius:8px;">
-            <div style="font-weight:bold;margin-bottom:8px;">Inicia sesión como profesor</div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
-                <div>
-                    <label>Usuario<br><input id="profUser" style="padding:8px;border:1px solid #ccc;border-radius:6px;"></label>
+        <!-- Modal de sesiones activas -->
+        <div id="sessionsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
+            <div style="background:#fff;border-radius:12px;max-width:720px;width:90%;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,0.25);">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                    <h3 style="margin:0;color:#2c3e50;">Sesiones activas</h3>
+                    <button id="closeSessionsModal" class="btn" style="background:#e0e0e0;color:#2c3e50;">Cerrar</button>
                 </div>
-                <div>
-                    <label>Contraseña<br><input id="profPass" type="password" style="padding:8px;border:1px solid #ccc;border-radius:6px;"></label>
-                </div>
-                <button class="btn-validate" onclick="submitProfessorLogin()">Ingresar</button>
+                <div id="sessionsMsg" style="margin-bottom:10px;color:#7f8c8d;"></div>
+                <div id="sessionsList" style="display:grid;gap:10px;max-height:60vh;overflow:auto;"></div>
             </div>
-            <div id="profLoginMsg" class="validation-message empty" style="margin-top:10px;"></div>
         </div>
+
+        
 
         <div class="stats">
             <div class="stat-card" onclick="showPendingRequests()" style="cursor: pointer;">
@@ -447,17 +447,9 @@
         </div>
 
         <!-- Usuarios Registrados -->
-        <div class="pending-requests">
-            <h2 class="section-title" style="margin-top:30px;">👥 Usuarios Registrados</h2>
-            <div id="usersList">
-                <div class="no-requests">
-                    <p>No hay usuarios registrados.</p>
-                </div>
-            </div>
-        </div>
     </div>
 
-    <button class="refresh-btn" onclick="loadPendingRequests(); loadPendingCodes(); loadFinalVerifications(); loadUsers();" title="Actualizar">
+    <button class="refresh-btn" onclick="loadPendingRequests(); loadPendingCodes(); loadFinalVerifications();" title="Actualizar">
         🔄
     </button>
 
@@ -476,6 +468,10 @@
         })();
         async function fetchJSON(url, options){
             const resp = await fetch(url, options);
+            if (resp.status === 401 || resp.status === 403) {
+                window.location.href = '/profesor-login?expired=1';
+                throw new Error('No autorizado');
+            }
             const ct = (resp.headers && resp.headers.get('content-type')) || '';
             if (!ct.includes('application/json')) {
                 const txt = await resp.text();
@@ -539,34 +535,6 @@
         }
 
         document.addEventListener('click', function(){ ensureAudio(); }, { once: true });
-
-        async function submitProfessorLogin() {
-            const u = document.getElementById('profUser')?.value?.trim();
-            const p = document.getElementById('profPass')?.value || '';
-            const msg = document.getElementById('profLoginMsg');
-            const setMsg = (t, ok) => { if(!msg) return; msg.textContent=t; msg.classList.remove('empty'); msg.classList.toggle('success', !!ok); msg.classList.toggle('error', !ok); };
-            if (!u || !p) { setMsg('Usuario y contraseña requeridos', false); return; }
-            try {
-                const r = await fetch('/api/auth/login-professor', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username:u, password:p }) });
-                const d = await r.json();
-                if (r.ok && d && d.success) {
-                    isProfessorAuth = true;
-                    const loginBox = document.getElementById('profLogin');
-                    if (loginBox) loginBox.style.display = 'none';
-                    setMsg('Inicio de sesión exitoso', true);
-                    // Cargar datos iniciales
-                    try { await loadPendingRequests(); } catch(_) {}
-                    try { await loadPendingCodes(); } catch(_) {}
-                    try { await loadFinalVerifications(); } catch(_) {}
-                    try { await updateStats(); } catch(_) {}
-                    try { await loadUsers(); } catch(_) {}
-                } else {
-                    setMsg(d.message || 'Credenciales incorrectas', false);
-                }
-            } catch (e) {
-                setMsg('Error de conexión', false);
-            }
-        }
 
         // ===== Usuarios (lista/editar/eliminar) =====
         window.loadUsers = async function() {
@@ -1409,6 +1377,10 @@
                     window.location.href = '/profesor-login?closed=1';
                 });
             }
+            const viewBtn = document.getElementById('viewSessionsBtn');
+            const closeMod = document.getElementById('closeSessionsModal');
+            if (viewBtn) viewBtn.addEventListener('click', openSessionsModal);
+            if (closeMod) closeMod.addEventListener('click', closeSessionsModal);
             if (fEl) {
                 fEl.value = String(beepFreq);
                 fEl.addEventListener('input', function(){

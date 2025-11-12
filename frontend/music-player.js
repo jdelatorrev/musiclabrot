@@ -110,8 +110,7 @@ function playSong() {
         audioPlayer.play().catch(err => console.error('No se pudo reproducir:', err));
     }
     isPlaying = true;
-    playPauseBtn.textContent = '⏸️';
-    playPauseBtn.classList.add('playing');
+    if (playPauseBtn) playPauseBtn.classList.add('playing');
 }
 
 // Pausar canción
@@ -120,8 +119,7 @@ function pauseSong() {
         audioPlayer.pause();
     }
     isPlaying = false;
-    playPauseBtn.textContent = '▶️';
-    playPauseBtn.classList.remove('playing');
+    if (playPauseBtn) playPauseBtn.classList.remove('playing');
 }
 
 // Canción anterior

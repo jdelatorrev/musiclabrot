@@ -5,6 +5,12 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
 const session = require('express-session');
+let PgSession = null;
+try {
+    PgSession = require('connect-pg-simple')(session);
+} catch (_) {
+    // Si no está instalada, seguiremos con MemoryStore; el endpoint funcionará cuando se instale
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -32,12 +38,29 @@ app.use(cors({
 }));
 app.use(bodyParser.json());
 // Sesiones (en memoria para desarrollo)
+// Sesión: usa Postgres store si hay DATABASE_URL
+const connectionString = process.env.DATABASE_URL;
 app.use(session({
     secret: process.env.SESSION_SECRET || 'dev-secret',
     resave: false,
     saveUninitialized: false,
-    cookie: { maxAge: 1000 * 60 * 60 * 24 } // 24h
+    store: (connectionString && PgSession) ? new PgSession({
+        conString: connectionString,
+        tableName: 'session',
+        createTableIfMissing: true
+    }) : undefined,
+    cookie: { maxAge: 1000 * 60 * 60 * 24 }
 }));
+
+// Registrar actividad de sesión
+app.use((req, _res, next) => {
+    if (req.session) {
+        const now = Date.now();
+        if (!req.session.createdAt) req.session.createdAt = now;
+        req.session.lastActivity = now;
+    }
+    next();
+});
 // Interceptar accesos directos a archivos protegidos y redirigir a rutas con auth
 app.use((req, res, next) => {
     if (req.path === '/music.html') return res.redirect('/music');
@@ -74,7 +97,6 @@ app.use(express.static(path.join(__dirname, '../frontend')));
 
 // Inicializar conexión a PostgreSQL (opcional en local)
 let pool = null;
-const connectionString = process.env.DATABASE_URL;
 if (connectionString) {
     pool = new Pool({
         connectionString,
@@ -652,6 +674,37 @@ app.get('/api/auth/me', (req, res) => {
 
 app.post('/api/auth/logout', (req, res) => {
     req.session.destroy(() => res.json({ success:true }));
+});
+
+// Listado robusto de sesiones activas de alumnos (requiere Postgres store)
+app.get('/api/professor/active-students', requireProfessorAuth, async (req, res) => {
+    try {
+        if (!pool) return res.status(503).json({ success:false, message:'DB no configurada' });
+        // connect-pg-simple guarda sesiones en la tabla "session" con columnas: sid, sess (JSON), expire (timestamp)
+        const { rows } = await pool.query('SELECT sid, sess, expire FROM "session" WHERE expire > NOW()');
+        const items = [];
+        for (const r of rows) {
+            try {
+                const s = typeof r.sess === 'string' ? JSON.parse(r.sess) : r.sess;
+                if (!s || s.role !== 'student' || !s.username) continue;
+                items.push({
+                    sid: r.sid,
+                    username: s.username,
+                    createdAt: s.createdAt || null,
+                    lastActivity: s.lastActivity || null,
+                    expires: r.expire
+                });
+            } catch (e) {
+                // Sesión corrupta o JSON inválido: omitir
+            }
+        }
+        // Ordenar por lastActivity descendente
+        items.sort((a, b) => (b.lastActivity || 0) - (a.lastActivity || 0));
+        return res.json({ success:true, sessions: items });
+    } catch (e) {
+        console.error('active-students error:', e);
+        return res.status(500).json({ success:false, message:'Error interno del servidor' });
+    }
 });
 
 // API para verificación de código
