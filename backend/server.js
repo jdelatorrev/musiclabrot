@@ -8,8 +8,10 @@ const session = require('express-session');
 let PgSession = null;
 try {
     PgSession = require('connect-pg-simple')(session);
-} catch (_) {
-    // Si no está instalada, seguiremos con MemoryStore; el endpoint funcionará cuando se instale
+    console.log('[INFO] connect-pg-simple cargado correctamente');
+} catch (err) {
+    console.warn('[WARN] connect-pg-simple no está instalado. Las sesiones se guardarán en memoria (se perderán al reiniciar).');
+    console.warn('[WARN] Instala con: npm install connect-pg-simple');
 }
 
 const app = express();
@@ -44,17 +46,33 @@ app.use(bodyParser.json());
 // Sesión: usa Postgres store si hay DATABASE_URL
 const connectionString = process.env.DATABASE_URL;
 const isProd = process.env.NODE_ENV === 'production';
+
+// Determinar qué store de sesiones usar
+let sessionStore = undefined;
+if (connectionString && PgSession) {
+    sessionStore = new PgSession({
+        conString: connectionString,
+        tableName: 'session',
+        createTableIfMissing: true
+    });
+    console.log('[INFO] Usando PostgreSQL para almacenar sesiones');
+} else {
+    console.warn('[WARN] Usando MemoryStore para sesiones (no persistente, solo para desarrollo)');
+    if (!connectionString) {
+        console.warn('[WARN] DATABASE_URL no configurado');
+    }
+    if (!PgSession) {
+        console.warn('[WARN] connect-pg-simple no está disponible');
+    }
+}
+
 app.use(session({
     secret: process.env.SESSION_SECRET || 'dev-secret',
     resave: false,
     saveUninitialized: false,
-    store: (connectionString && PgSession) ? new PgSession({
-        conString: connectionString,
-        tableName: 'session',
-        createTableIfMissing: true
-    }) : undefined,
+    store: sessionStore,
     cookie: {
-        maxAge: 1000 * 60 * 60 * 24,
+        maxAge: 1000 * 60 * 60 * 24, // 24 horas
         sameSite: isProd ? 'none' : 'lax',
         secure: isProd
     }
@@ -695,11 +713,16 @@ app.post('/api/auth/login-student', async (req, res) => {
         const g = await pool.query('SELECT granted FROM access_grants WHERE username=$1', [username]);
         const granted = g.rows[0] ? !!g.rows[0].granted : false;
         if (!granted) return res.status(403).json({ success:false, message:'Aún no tienes acceso concedido' });
+        
+        // Establecer sesión
         req.session.role = 'student';
         req.session.username = username;
+        
+        console.log(`[INFO] Estudiante ${username} inició sesión exitosamente. SessionID: ${req.sessionID}`);
+        
         return res.json({ success:true });
     } catch (e) {
-        console.error('login-student error:', e);
+        console.error('[ERROR] login-student error:', e);
         return res.status(500).json({ success:false, message:'Error interno del servidor' });
     }
 });

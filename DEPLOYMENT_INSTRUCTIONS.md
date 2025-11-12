@@ -26,14 +26,18 @@ Se han agregado las siguientes funcionalidades al backend:
 
 ```bash
 # Añadir los archivos modificados
-git add backend/server.js
+git add backend/server.js backend/package.json
 
 # Hacer commit
-git commit -m "feat: agregar gestión de sesiones activas para profesor"
+git commit -m "feat: agregar gestión de sesiones activas y fix connect-pg-simple"
 
 # Push a tu repositorio
 git push origin main
 ```
+
+### Paso 1.5: Railway Instalará las Dependencias
+
+Railway ejecutará automáticamente `npm install`, lo que instalará el nuevo paquete `connect-pg-simple` que es crítico para que las sesiones funcionen en producción.
 
 ### Paso 2: Railway Desplegará Automáticamente
 
@@ -109,13 +113,59 @@ PROFESSOR_PASS=tu_password_profesor
 
 Una vez desplegado, estos logs te ayudarán a verificar el funcionamiento:
 
-- `[INFO] Tabla de sesiones inicializada correctamente` - Tabla creada exitosamente
+### ✅ Al Iniciar el Servidor (Verifica que aparezcan estos):
+```
+[INFO] connect-pg-simple cargado correctamente
+[INFO] Usando PostgreSQL para almacenar sesiones
+[INFO] Tabla de sesiones inicializada correctamente
+```
+
+### ⚠️ Si NO aparecen, verás algo como:
+```
+[WARN] connect-pg-simple no está instalado
+[WARN] Usando MemoryStore para sesiones (no persistente)
+```
+**Esto significa que las sesiones NO se están guardando en la base de datos y NO funcionará el listado de sesiones activas.**
+
+### ✅ Durante el Funcionamiento:
+- `[INFO] Estudiante {username} inició sesión exitosamente. SessionID: {sid}` - Login exitoso
 - `[INFO] Sesiones totales activas en BD: X` - Cantidad de sesiones en la BD
 - `[INFO] Sesiones de estudiantes activas: X` - Cantidad de sesiones de estudiantes
 - `[INFO] Limpieza automática: X sesiones expiradas eliminadas` - Limpieza automática funcionando
 - `Sesión {sid} cerrada por el profesor` - Sesión cerrada exitosamente
 
 ## Troubleshooting
+
+### ⚠️ Problema: "No hay sesiones activas" aunque hay estudiantes conectados
+
+**Causa Más Común**: El paquete `connect-pg-simple` no estaba instalado, por lo que las sesiones se guardaban en memoria (MemoryStore) en lugar de PostgreSQL.
+
+**Síntomas**:
+- Los estudiantes pueden iniciar sesión correctamente
+- Pueden acceder a `/music` sin problemas
+- Pero en el panel del profesor, "Ver sesiones" muestra "No hay sesiones activas"
+
+**Solución**:
+1. **Verifica en los logs de Railway al iniciar el servidor**:
+   - ✅ Debe aparecer: `[INFO] connect-pg-simple cargado correctamente`
+   - ✅ Debe aparecer: `[INFO] Usando PostgreSQL para almacenar sesiones`
+   - ❌ Si aparece: `[WARN] Usando MemoryStore` → El problema persiste
+
+2. **Si aún usa MemoryStore**:
+   ```bash
+   # Hacer push de los cambios que incluyen connect-pg-simple
+   git add backend/package.json backend/server.js
+   git commit -m "fix: agregar connect-pg-simple para sesiones persistentes"
+   git push origin main
+   ```
+
+3. **Esperar a que Railway complete el despliegue** (2-3 minutos)
+
+4. **Verificar nuevamente los logs** - Deben aparecer los mensajes `[INFO]`
+
+5. **Hacer que un estudiante inicie sesión nuevamente**
+
+6. **Ir al panel del profesor → "Ver sesiones"** - Ahora debería aparecer
 
 ### Error: "Tabla de sesiones no encontrada"
 
