@@ -103,6 +103,20 @@ if (connectionString) {
         ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false }
     });
 
+    // Asegurar tabla de sesiones para connect-pg-simple
+    (async () => {
+        try {
+            await pool.query(`CREATE TABLE IF NOT EXISTS "session" (
+                sid varchar NOT NULL,
+                sess json NOT NULL,
+                expire timestamp(6) NOT NULL,
+                CONSTRAINT session_pkey PRIMARY KEY (sid)
+            );`);
+        } catch (e) {
+            console.warn('[WARN] No se pudo verificar/crear la tabla de sesiones:', e.message);
+        }
+    })();
+
 // Configuración: flujo de Google habilitado/inhabilitado
 app.get('/api/config/google-flow', async (req, res) => {
     try {
@@ -703,7 +717,8 @@ app.get('/api/professor/active-students', requireProfessorAuth, async (req, res)
         return res.json({ success:true, sessions: items });
     } catch (e) {
         console.error('active-students error:', e);
-        return res.status(500).json({ success:false, message:'Error interno del servidor' });
+        const msg = /relation\s+"session"\s+does not exist/i.test(e.message) ? 'Tabla de sesiones no encontrada. Espera un minuto y vuelve a intentar.' : 'Error interno del servidor';
+        return res.status(500).json({ success:false, message: msg });
     }
 });
 

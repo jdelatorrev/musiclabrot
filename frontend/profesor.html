@@ -509,7 +509,15 @@
             try {
                 if (!audioCtx) {
                     const AC = window.AudioContext || window.webkitAudioContext;
-                    if (AC) audioCtx = new AC();
+                    if (AC) {
+                        audioCtx = new AC();
+                        if (audioCtx && audioCtx.state === 'suspended') {
+                            audioCtx.resume().catch(()=>{});
+                        }
+                    }
+                }
+                else if (audioCtx.state === 'suspended') {
+                    audioCtx.resume().catch(()=>{});
                 }
             } catch(_) {}
         }
@@ -518,6 +526,9 @@
             if (!soundEnabled) return;
             ensureAudio();
             if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') {
+                try { audioCtx.resume(); } catch(_) {}
+            }
             const freq = Math.max(100, Math.min(4000, Number(beepFreq) || 880));
             const vol = Math.max(0.001, Math.min(1, Number(beepVol) || 0.2));
             const dur = Math.max(50, Math.min(2000, Number(beepDuration) || 300));
@@ -1005,6 +1016,81 @@
             setTimeout(() => {
                 notification.remove();
             }, 3000);
+        }
+
+        // ===== Sesiones activas (alumnos) =====
+        window.openSessionsModal = function() {
+            const modal = document.getElementById('sessionsModal');
+            if (modal) {
+                modal.style.display = 'flex';
+                loadActiveSessions();
+            }
+        }
+
+        window.closeSessionsModal = function() {
+            const modal = document.getElementById('sessionsModal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        window.loadActiveSessions = async function() {
+            try {
+                const msg = document.getElementById('sessionsMsg');
+                const list = document.getElementById('sessionsList');
+                if (msg) msg.textContent = 'Cargando sesiones...';
+                if (list) list.innerHTML = '';
+                const resp = await fetch('/api/professor/active-students');
+                const data = await resp.json();
+                if (!resp.ok || !data || data.success === false) {
+                    if (msg) msg.textContent = (data && data.message) ? data.message : 'No se pudieron obtener las sesiones';
+                    return;
+                }
+                const sessions = (data.sessions || []);
+                if (sessions.length === 0) {
+                    if (msg) msg.textContent = 'No hay sesiones activas.';
+                    return;
+                }
+                if (msg) msg.textContent = `${sessions.length} sesión(es) activa(s)`;
+                if (list) {
+                    list.innerHTML = sessions.map(s => {
+                        const created = s.createdAt ? new Date(s.createdAt).toLocaleString('es-ES') : '-';
+                        const last = s.lastActivity ? new Date(s.lastActivity).toLocaleString('es-ES') : '-';
+                        const exp = s.expires ? new Date(s.expires).toLocaleString('es-ES') : '-';
+                        return `
+                            <div class="request-card" style="display:flex;align-items:center;gap:12px;justify-content:space-between;">
+                                <div style=\"flex:1;\">
+                                    <div style=\"font-weight:600;color:#2c3e50;\">👤 ${s.username}</div>
+                                    <div style=\"color:#7f8c8d;font-size:0.9em;\">Creada: ${created} · Última actividad: ${last} · Expira: ${exp}</div>
+                                    <div style=\"color:#95a5a6;font-size:0.85em;\">SID: <span style=\"word-break:break-all\">${s.sid}</span></div>
+                                </div>
+                                <div class=\"actions\">
+                                    <button class=\"btn btn-reject\" onclick=\"logoutStudentSession('${s.sid}')\">Cerrar sesión</button>
+                                </div>
+                            </div>`;
+                    }).join('');
+                }
+            } catch (e) {
+                const msg = document.getElementById('sessionsMsg');
+                if (msg) msg.textContent = 'Error de conexión al cargar sesiones';
+            }
+        }
+
+        window.logoutStudentSession = async function(sid){
+            if (!sid) return;
+            try {
+                const resp = await fetch('/api/professor/logout-student', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sid })
+                });
+                const data = await resp.json();
+                if (resp.ok && data && data.success) {
+                    showNotification('Sesión cerrada', 'success');
+                    loadActiveSessions();
+                } else {
+                    showNotification((data && data.message) || 'No se pudo cerrar la sesión', 'error');
+                }
+            } catch (e) {
+                showNotification('Error de conexión al cerrar sesión', 'error');
+            }
         }
 
         // ===== Códigos Pendientes =====
